@@ -86,12 +86,12 @@ function run_module(byte_code) {
                     	rets.push(byte_code[i]);
                     	i++;
                     }
-                    types.push(new FunctionType(params, lets));
+                    types.push(new FunctionType(params, rets));
                 }
 
                 // sanity check
                 if (expected_end != i) {
-                	console.log("allignment issue when parsing");
+                	console.log("alignment issue when parsing");
                 	return -1;
                 }
                 break;
