@@ -1,4 +1,4 @@
-const ModuleInstance = require('ModuleInstance'); 
+const ModuleInstance = require('ModuleInstance');
 const Leb = require('leb');
 
 const custom_section_id = 0;
@@ -30,7 +30,7 @@ function run_module(byte_code) {
     let memAddrs = [];
     let globalAddrs = [];
     let module_exports = [];
-    
+
     // parse byte_code to module instance
     let i = 0;
     // check magic value
@@ -56,17 +56,17 @@ function run_module(byte_code) {
                 let decode = Leb.decodeUint32(byte_code, i);
                 i += decode.nextIndex;
                 let expected_end = i + decode.value;
-                
+
                 // get vector of values
                 let decoded_vec = Leb.decodeUint32(byte_code, i);
                 i += decoded_vec.nextIndex;
                 let num_els = decoded_vec.value;
-                
+
                 // get type
                 for (let j = 0; j < num_els; j++) {
                 	// sanity check
 	                if (byte_code[i] != function_type) {
-	                	console.log("allignment issue when parsing");
+	                	console.log("alignment issue when parsing");
 	                	return -1;
 	                }
 	                i++;
@@ -179,7 +179,7 @@ function run_module(byte_code) {
                 break;
         }
     }
-    
+
 
     let module = new ModuleInstance(types, funcAddrs, tableAddrs, memAddrs, globalAddrs, module_exports);
 
