@@ -65,43 +65,6 @@ function run_module(byte_code) {
                 i = decoded_vec.nextIndex;
                 let num_els = decoded_vec.value;
 
-                // get type_idx
-                type_idxs = []
-                for (let j = 0; j < num_els; j++) {
-                    let decoded_typeidx= Leb.decodeUint32(byte_code, i);
-                    i = decoded_params.nextIndex;
-                    func_type_idxs.push(decoded_typeidx);
-                }
-
-                // sanity check
-                if (expected_end != i) {
-                	console.log("alignment issue when parsing");
-                	return -1;
-                }
-                break;
-
-            case import_section_id:
-                i++;
-                let decode = Leb.decodeUint32(byte_code, i);
-                i = decode.nextIndex;
-                let size = decode.value;
-
-                // ignore for now
-                i += size;
-                break;
-
-            case function_section_id:
-                i++;
-                let decode = Leb.decodeUint32(byte_code, i);
-                i = decode.nextIndex;
-                let size = decode.value;
-                let expected_end = i + size;
-
-                // get vector of values
-                let decoded_vec = Leb.decodeUint32(byte_code, i);
-                i = decoded_vec.nextIndex;
-                let num_els = decoded_vec.value;
-
                 // get type
                 for (let j = 0; j < num_els; j++) {
                 	// sanity check
@@ -135,8 +98,43 @@ function run_module(byte_code) {
                 	return -1;
                 }
                 break;
-                // TODO
+
+            case import_section_id:
+                i++;
+                let decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                let size = decode.value;
+
+                // ignore for now
+                i += size;
                 break;
+
+            case function_section_id:
+                i++;
+                let decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                let expected_end = i + decode.value;
+
+                // get vector of values
+                let decoded_vec = Leb.decodeUint32(byte_code, i);
+                i = decoded_vec.nextIndex;
+                let num_els = decoded_vec.value;
+
+                // get type_idx
+                type_idxs = []
+                for (let j = 0; j < num_els; j++) {
+                    let decoded_typeidx= Leb.decodeUint32(byte_code, i);
+                    i = decoded_params.nextIndex;
+                    func_type_idxs.push(decoded_typeidx);
+                }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+                break;
+
 
             case table_section_id:
                 i++;
