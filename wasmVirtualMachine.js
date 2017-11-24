@@ -45,21 +45,23 @@ function run_module(byte_code) {
         // should be at the start of a section
         switch(byte_code[i]) {
             case custom_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
                 // ignore for now
                 i += size;
                 break;
 
             case type_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let expected_end = i + decode.value;
 
                 // get vector of values
                 let decoded_vec = Leb.decodeUint32(byte_code, i);
-                i += decoded_vec.nextIndex;
+                i = decoded_vec.nextIndex;
                 let num_els = decoded_vec.value;
 
                 // get type
@@ -71,7 +73,7 @@ function run_module(byte_code) {
 	                }
 	                i++;
                     let decoded_params = Leb.decodeUint32(byte_code, i);
-                    i += decoded_params.nextIndex;
+                    i = decoded_params.nextIndex;
                     let num_params = decoded_params.value;
                     params = [];
                     for (let p = 0; p < num_params; p++) {
@@ -79,7 +81,7 @@ function run_module(byte_code) {
                     	i++;
                     }
                     let decoded_rets = Leb.decodeUint32(byte_code, i);
-                    i += decoded_rets.nextIndex;
+                    i = decoded_rets.nextIndex;
                     let num_rets = decoded_rets.value;
                     rets = [];
                     for (let p = 0; p < num_rets; p++) {
@@ -97,8 +99,9 @@ function run_module(byte_code) {
                 break;
 
             case import_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // ignore for now
@@ -106,48 +109,54 @@ function run_module(byte_code) {
                 break;
 
             case function_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case table_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case memory_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case global_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case export_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case start_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // ignore for now
@@ -155,24 +164,27 @@ function run_module(byte_code) {
                 break;
 
             case element_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case code_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
                 break;
 
             case data_section_id:
+                i++;
                 let decode = Leb.decodeUint32(byte_code, i);
-                i += decode.nextIndex;
+                i = decode.nextIndex;
                 let size = decode.value;
 
                 // TODO
