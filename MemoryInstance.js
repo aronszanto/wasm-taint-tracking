@@ -1,6 +1,13 @@
-export default class {
-    constructor(bytes = [], max_size = undefined) {
-        this.bytes = bytes;
-        this.max_size = max_size;
+const page_size = 65536;
+class MemoryInstance {
+    constructor(limits, bytes = undefined) {
+        this.limits = limits;
+        if (bytes == undefined) {
+            this.bytes = new Uint8Array(limits.min);
+        } else {
+            this.bytes = bytes;
+        }
     }
 }
+
+module.exports = MemoryInstance;

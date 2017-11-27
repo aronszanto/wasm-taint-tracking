@@ -1,4 +1,4 @@
-export default class {
+class ModuleInstace {
     constructor(types = [], funcAddrs = [], tableAddrs = [], memAddrs = [], globalAddrs = [], exports = []) {
         this.types = types;
         this.funcAddrs = funcAddrs;
@@ -8,3 +8,5 @@ export default class {
         this.exports = exports;
     }
 }
+
+module.exports = ModuleInstace;

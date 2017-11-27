@@ -1,4 +1,4 @@
-export default class {
+class Stack {
     constructor() {
         this.data = [];
     }
@@ -15,3 +15,5 @@ export default class {
         return this.data[idx];
     }
 }
+
+module.exports = Stack;
