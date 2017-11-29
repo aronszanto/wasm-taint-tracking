@@ -1,6 +1,8 @@
 const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
 const FunctionInstance = require('./FunctionInstance');
+const GlobalInstance = require('./GlobalInstance');
+const ExportInstance = require('./ExportInstance');
 const Limit = require('./Limit');
 const Variable = require('./Variable');
 const Leb = require('leb');
@@ -268,9 +270,38 @@ function run_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of exports
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get export instance
+                for (let j = 0; j < num_els; j++) {
+                    // get name (identifier: byte array wich is valid UTF-8)
+                    let name = [];
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let len = decode.value;
+
+                    for (let k = 0; k < len; k++) {
+                        name.push(byte_code[i]);
+                        i++;
+                    }
+
+                    // get export kind (func, table, mem or global)
+                    let kind = byte_code[i];
+                    i++;
+
+                    // get index (address in list of kind)
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let index = decode.value;
+
+                    // construct export
+                    globals.push(new ExportInstance(name, kind, index));
+                }
                 break;
 
             case start_section_id:
