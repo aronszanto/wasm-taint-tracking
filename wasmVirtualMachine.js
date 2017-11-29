@@ -168,9 +168,9 @@ function run_module(byte_code) {
                 // get type_idx
                 let type_idxs = []
                 for (let j = 0; j < num_els; j++) {
-                    let decoded_typeidx= Leb.decodeUint32(byte_code, i);
+                    let decoded_typeidx = Leb.decodeUint32(byte_code, i);
                     i = decoded_params.nextIndex;
-                    func_type_idxs.push(decoded_typeidx);
+                    func_type_idxs.push(decoded_typeidx.value);
                 }
 
                 // sanity check
@@ -235,9 +235,33 @@ function run_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of globals
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get global
+                for (let j = 0; j < num_els; j++) {
+                    // get global description (type and mutability, mut is 0 or 1)
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let type = decode.value;
+
+                    // no need to decode since varuint1 (only one byte)
+                    let mut = byte_code[i];
+                    i++;
+
+                    // evaluate initializer expression can be either get_global or const of any type
+                    let init_value;
+                    let ret = parse_init_expression(byte_code, i);
+                    init_value = ret.value;
+                    i = ret.nextIndex;
+
+                    // construct global
+                    globals.push(new GlobalInstance(type, init_value, mut));
+                }
                 break;
 
             case export_section_id:
