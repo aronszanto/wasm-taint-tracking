@@ -554,9 +554,47 @@ function build_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of table initializers
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get table initializer
+                for (let j = 0; j < num_els; j++) {
+                    // get table index 
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    table_index = decode.value;
+
+                    // get offset
+                    let offset;
+                    let ret = parse_init_expression(byte_code, i);
+                    offset = ret.value;
+                    i = ret.nextIndex;
+
+                    // get elements (array of function indices)
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    len = decode.value;
+
+                    // sanity check: 
+                    if (offset + len > tables[table_index].max_size) {
+                        console.log("table element indexing issue");
+                        return -1;
+                    }
+
+                    for (let k = 0; k < len; k++) {
+                        // get func index
+                        decode = Leb.decodeUint32(byte_code, i);
+                        i = decode.nextIndex;
+                        func_index = decode.value;
+
+                        // store func index at offset in element list
+                        tables[table_index].elements[offset + k] = func_index; 
+                    }
+                }
                 break;
 
             case code_section_id:
