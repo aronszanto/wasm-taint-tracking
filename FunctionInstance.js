@@ -1,7 +1,7 @@
 class FunctionInstance {
-    constructor(type, module, code) {
+    constructor(type, locals, code) {
         this.type = type;
-        this.module = module;
+        this.locals = locals;
         this.code = code;
     }
 }

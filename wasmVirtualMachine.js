@@ -1,6 +1,8 @@
 const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
+const FunctionInstance = require('./FunctionInstance');
 const Limit = require('./Limit');
+const Variable = require('./Variable');
 const Leb = require('leb');
 
 const custom_section_id = 0;
@@ -270,9 +272,48 @@ function run_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get vector of functions
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get function
+                for (let j = 0; j < num_els; j++) {
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let func_size = decode.value;
+
+                    // sanity check
+                    if (byte_code[i + func_size - 1] != expression_end_code) {
+                        console.log("malformed function in code section.");
+                	    return -1;
+                    }
+                    let func_end = i + func_size;
+                    
+                    // get locals
+                    let locals = [];
+                   	decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let num_locals = decode.value;
+                    for (let k = 0; k < num_locals; k++) {
+                        decode = Leb.decodeUint32(byte_code, i);
+                        i = decode.nextIndex;
+                        let num_of_type = decode.value;
+                        for (let p = 0; p < num_of_type; p++) {
+                            locals.push(new Variable(byte_code[i]));
+                        }
+                        i++;
+                    }
+
+                    let code = new Uint8Array(func_end - i);
+                    for (let pos = 0; i < func_end; i++) {
+                        code[pos] = byte_code[i];
+                        pos++;
+                    }
+                    funcs.push(new FunctionInstance(types[func_type_idxs[j]], locals, code));
+                }
                 break;
 
             case data_section_id:
