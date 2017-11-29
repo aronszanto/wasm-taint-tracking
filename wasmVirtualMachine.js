@@ -253,7 +253,7 @@ function run_module(byte_code) {
                     let mut = byte_code[i];
                     i++;
 
-                    // evaluate initializer expression can be either get_global or const of any type
+                    // evaluate initializer expression can be either get_global or const
                     let init_value;
                     let ret = parse_init_expression(byte_code, i);
                     init_value = ret.value;
