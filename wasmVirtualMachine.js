@@ -415,6 +415,13 @@ function build_module(byte_code) {
                     // construct table 
                     tables.push(new TableInstance(type, min_size, max_size, []));
                 }
+                
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
 
@@ -491,6 +498,13 @@ function build_module(byte_code) {
                     // construct global
                     globals.push(new GlobalInstance(type, init_value, mut));
                 }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case export_section_id:
@@ -529,6 +543,13 @@ function build_module(byte_code) {
                     // construct export
                     exports.push(new ExportInstance(name, kind, index));
                 }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case start_section_id:
@@ -595,6 +616,12 @@ function build_module(byte_code) {
                         tables[table_index].elements[offset + k] = func_index; 
                     }
                 }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
                 break;
 
             case code_section_id:
@@ -643,6 +670,13 @@ function build_module(byte_code) {
                     }
                     funcs.push(new FunctionInstance(types[func_type_idxs[j]], locals, code));
                 }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case data_section_id:
