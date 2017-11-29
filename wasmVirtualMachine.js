@@ -4,6 +4,7 @@ const FunctionInstance = require('./FunctionInstance');
 const FunctionType = require('./FunctionType');
 const GlobalInstance = require('./GlobalInstance');
 const ExportInstance = require('./ExportInstance');
+const TableInstance = require('./TableInstance');
 const Limit = require('./Limit');
 const Variable = require('./Variable');
 const Leb = require('leb');
@@ -374,10 +375,48 @@ function build_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of table descriptions
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get table description
+                for (let j = 0; j < num_els; j++) {
+                    // table element type
+                    type = byte_code[i];
+                    i++;
+
+                    // // sanity check
+                    // if (type != -0x10) {
+                    //     console.log("issue with table type, can only be anyfunc");
+                    //     return -1;
+                    // }
+                    
+                    // get resizable limits, first the flag
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let flags = decode.value;
+
+                    // get minimum, always has minimum 
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let min_size = decode.value;
+
+                    // if bit 0x1 is set in flags get maximum
+                    let max_size = undefined;
+                    if (flags % 2 == 1) {
+                        decode = Leb.decodeUint32(byte_code, i);
+                        i = decode.nextIndex;
+                        max_size = decode.value;
+                    }
+
+                    // construct table 
+                    tables.push(new TableInstance(type, min_size, max_size, []));
+                }
                 break;
+
 
             case memory_section_id:
                 i++;
@@ -488,7 +527,7 @@ function build_module(byte_code) {
                     let index = decode.value;
 
                     // construct export
-                    globals.push(new ExportInstance(name, kind, index));
+                    exports.push(new ExportInstance(name, kind, index));
                 }
                 break;
 

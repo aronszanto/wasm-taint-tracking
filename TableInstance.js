@@ -1,6 +1,8 @@
 class TableInstance {
-    constructor(elements = [], max_size = undefined) {
+    constructor(type, min_size, max_size = undefined, elements = []) {
+        this.type = type;
         this.elements = elements;
+        this.min_size = min_size;
         this.max_size = max_size;
     }
 }
