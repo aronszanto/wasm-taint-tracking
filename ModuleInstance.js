@@ -1,11 +1,14 @@
+const Stack = require('./Stack');
+
 class ModuleInstace {
-    constructor(types = [], funcAddrs = [], tableAddrs = [], memAddrs = [], globalAddrs = [], exports = []) {
-        this.types = types;
-        this.funcAddrs = funcAddrs;
-        this.tableAddrs = tableAddrs;
-        this.memAddrs = memAddrs;
-        this.globalAddrs = globalAddrs;
+    constructor(funcs = [], tables = [], memories = [], globals = [], exports = [], start = undefined) {
+        this.funcs = funcs;
+        this.tables = tables;
+        this.memories = memories;
+        this.globals = globals;
         this.exports = exports;
+        this.start = start;
+        this.stack = new Stack();
     }
 }
 
