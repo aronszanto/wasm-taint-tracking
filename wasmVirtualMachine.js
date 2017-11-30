@@ -37,6 +37,7 @@ const nop_op_code = 0x01;
 const block_op_code = 0x02;
 const loop_op_code = 0x03;
 const if_op_code = 0x04;
+const else_op_code = 0x05;
 const br_op_code = 0x0C;
 const br_if_op_code = 0x0D;
 const br_table_op_code = 0x0E;
@@ -220,6 +221,9 @@ const i64_reinterpret_f64_op_code = 0xBD;
 const f32_reinterpret_i32_op_code = 0xBE;
 const f64_reinterpret_i64_op_code = 0xBF;
 
+
+const TRAP_CODE = -2;
+
 // module building blocks
 let types = [];
 let func_type_idxs = [];
@@ -231,31 +235,31 @@ let module_exports = [];
 let start = undefined;
 
 function parse_init_expression(byte_code, i) {
-	let ret;
-	switch(byte_code[i]) {
-    	case const_i32_op_code:
-    		decode = Leb.decodeInt32(byte_code, i);
+    let ret;
+    switch(byte_code[i]) {
+        case const_i32_op_code:
+            decode = Leb.decodeInt32(byte_code, i);
             i = decode.nextIndex;
             ret = decode.value;
-    		break;
-    	case const_i64_op_code:
-    		decode = Leb.decodeInt64(byte_code, i);
+            break;
+        case const_i64_op_code:
+            decode = Leb.decodeInt64(byte_code, i);
             i = decode.nextIndex;
             ret = decode.value;
-    		break;
-    	case const_f32_op_code:
-    	case const_f64_op_code:
-    		console.log("floating point operations not supported");
-			return -1;
-    	case get_global_op_code:
-    		decode = Leb.decodeUint32(byte_code, i);
+            break;
+        case const_f32_op_code:
+        case const_f64_op_code:
+            console.log("floating point operations not supported");
+            return -1;
+        case get_global_op_code:
+            decode = Leb.decodeUint32(byte_code, i);
             i = decode.nextIndex;
             ret = globals[decode.value].value;
-    		break;
+            break;
     }
     return {
-    	value: ret,
-    	nextIndex: i
+        value: ret,
+        nextIndex: i
     };
 }
 
@@ -300,38 +304,38 @@ function build_module(byte_code) {
 
                 // get mem
                 for (let j = 0; j < num_els; j++) {
-                	// sanity check
-	                if (byte_code[i] != function_type) {
-	                	console.log("alignment issue when parsing");
-	                	return -1;
-	                }
-	                i++;
+                  // sanity check
+                  if (byte_code[i] != function_type) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                  }
+                  i++;
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let num_params = decode.value;
                     params = [];
                     for (let p = 0; p < num_params; p++) {
-                    	params.push(byte_code[i]);
-                    	i++;
+                      params.push(byte_code[i]);
+                      i++;
                     }
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let num_rets = decode.value;
                     let rets = [];
                     for (let p = 0; p < num_rets; p++) {
-                    	rets.push(byte_code[i]);
-                    	i++;
+                      rets.push(byte_code[i]);
+                      i++;
                     }
                     types.push(new FunctionType(params, rets));
                 }
 
                 // sanity check
                 if (expected_end != i) {
-                	console.log("alignment issue when parsing");
-                	return -1;
+                  console.log("alignment issue when parsing");
+                  return -1;
                 }
                 break;
-                
+
             case import_section_id:
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
@@ -393,9 +397,9 @@ function build_module(byte_code) {
                     let min = undefined;
                     let max = undefined;
                     let lim_type = byte_code[i];
-	                i++;
+                  i++;
                     if (lim_type == limit_min_type || lim_type == limit_min_max_type) {
-	                    // get min	
+                      // get min
                         decode = Leb.decodeUint32(byte_code, i);
                         i = decode.nextIndex;
                         min = decode.value;
@@ -405,17 +409,17 @@ function build_module(byte_code) {
                             i = decode.nextIndex;
                             max = decode.value;
                         }
-	                } else {
+                  } else {
                         console.log("alignment issue when parsing");
-	                	return -1;
+                    return -1;
                     }
                     mems.push(new MemoryInstance(new Limit(min, max)));
                 }
 
                 // sanity check
                 if (expected_end != i) {
-                	console.log("alignment issue when parsing");
-                	return -1;
+                  console.log("alignment issue when parsing");
+                  return -1;
                 }
                 break;
 
@@ -442,7 +446,7 @@ function build_module(byte_code) {
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
-                
+
                 // get the index of the start function
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
@@ -450,8 +454,8 @@ function build_module(byte_code) {
 
                 // sanity check
                 if (expected_end != i) {
-                	console.log("alignment issue when parsing");
-                	return -1;
+                  console.log("alignment issue when parsing");
+                  return -1;
                 }
 
                 break;
@@ -485,13 +489,13 @@ function build_module(byte_code) {
                     // sanity check
                     if (byte_code[i + func_size - 1] != expression_end_code) {
                         console.log("malformed function in code section.");
-                	    return -1;
+                      return -1;
                     }
                     let func_end = i + func_size;
-                    
+
                     // get locals
                     let locals = [];
-                   	decode = Leb.decodeUint32(byte_code, i);
+                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let num_locals = decode.value;
                     for (let k = 0; k < num_locals; k++) {
@@ -536,26 +540,26 @@ function build_module(byte_code) {
                     offset = ret.value;
                     i = ret.nextIndex;
 
-                   	// get data
-                   	decode = Leb.decodeUint32(byte_code, i);
+                     // get data
+                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let data_len = decode.value;
                     for (let k = 0; k < data_len; k++) {
-                    	memories[mem_idx].bytes[offset + k] = byte_code[i];
-                    	i++;
+                      memories[mem_idx].bytes[offset + k] = byte_code[i];
+                      i++;
                     }
                 }
 
                 // sanity check
                 if (expected_end != i) {
-                	console.log("alignment issue when parsing");
-                	return -1;
+                  console.log("alignment issue when parsing");
+                  return -1;
                 }
                 break;
 
             default:
-            	console.log("Encountered unknown section id");
-               	return -1;
+              console.log("Encountered unknown section id");
+                 return -1;
         }
     }
 
@@ -587,6 +591,9 @@ function run_function(mod, function_idx, params) {
         mod.stack.push(el);
     });
 
+    
+    let labels = [];
+    
     // execute the code
     let code_ptr = 0;
     while (code_ptr < func.code.length) {
@@ -596,532 +603,683 @@ function run_function(mod, function_idx, params) {
 
             // control instruction op codes
             case unreachable_op_code:
-            	//TODO
-            	break;
-			case nop_op_code:
-				//TODO
-				break;
-			case block_op_code:
-				//TODO
-				break;
-			case loop_op_code:
-				//TODO
-				break;
-			case if_op_code:
-				//TODO
-				break;
-			case br_op_code:
-				//TODO
-				break;
-			case br_if_op_code:
-				//TODO
-				break;
-			case br_table_op_code:
-				//TODO
-				break;
-			case return_op_code:
-				//TODO
-				break;
-			case call_op_code:
-				//TODO
-				break;
-			case call_indirect_op_code:
-				//TODO
-				break;
+                return TRAP_CODE;
+            case nop_op_code:
+                // Do nothing
+                code_ptr++;
+                break;
+            case block_op_code:
+                // get block type
+                code_ptr++;
+                let type = func.code[code_ptr];
+                code_ptr++;
+                labels.push(
+                    {
+                        block_type: block_op_code,
+                        ret_type: type,
+                        start: code_ptr-1
+                    }
+                );
+                break;
+            case loop_op_code:
+                // get block type
+                code_ptr++;
+                let type = func.code[code_ptr];
+                code_ptr++;
+                labels.push(
+                    {
+                        block_type: loop_op_code,
+                        ret_type: type,
+                        start: code_ptr-1
+                    }
+                );
+                break;
+            case if_op_code:
+                code_ptr++;
+                let test_val = mod.stack.pop();
+                if (test_val.type != int32_type) {
+                    console.log("invalid test type at the top of the stack");
+                    return -1;
+                }
+                if (test_val.value != 0) {
+                    // get block type
+                    let type = func.code[code_ptr];
+                    code_ptr++;
+                    labels.push(
+                        {
+                            block_type: if_op_code,
+                            ret_type: type,
+                            start: code_ptr-1
+                        }
+                    );
+                } else {
+                    // skip to either end or else
+                    while (func.code[code_ptr] != else_op_code || func.code[code_ptr] != expression_end_code) {
+                        code_ptr++;
+                    }
 
-			// parametric op codes
-			case drop_op_code:
-				//TODO
-				break;
-			case select_op_code:
-				//TODO
-				break;
+                    if (func.code[code_ptr] == else_op_code) {
+                        // get block type
+                        let type = func.code[code_ptr];
+                        code_ptr++;
+                        labels.push(
+                            {
+                                block_type: if_op_code,
+                                ret_type: type,
+                                start: code_ptr-1
+                            }
+                        );
+                    }
+                }
+                break;
+            case else_op_code:
+                //TODO: remove label from labels and validate 
+                // skip until end
+                while (func.code[code_ptr] != expression_end_code) {
+                    code_ptr++;
+                }
+                code_ptr++;
+                break;
+            case expression_end_code:
+                //TODO: remove label from labels and validate 
+                break;
+            case br_op_code:
+                //TODO
+                break;
+            case br_if_op_code:
+                //TODO
+                break;
+            case br_table_op_code:
+                //TODO
+                break;
+            case return_op_code:
+                //TODO
+                break;
+            case call_op_code:
+                //TODO
+                break;
+            case call_indirect_op_code:
+                //TODO
+                break;
 
-			// variable op codes
-			case get_local_op_code:
-				//TODO
-				break;
-			case set_local_op_code:
-				//TODO
-				break;
-			case tee_local_op_code:
-				//TODO
-				break;
-			case get_global_op_code:
-				//TODO
-				break;
-			case set_global_op_code:
-				//TODO
-				break;
+            // parametric op codes
+            case drop_op_code:
+                if (mod.stack.len() <= 0) {
+                    console.log("tried to drop from an empty stack");
+                    return -1;
+                }
+                mod.stack.pop();
+                code_ptr++;
+                break;
+            case select_op_code:
+                if (mod.stack.len() < 3) {
+                    console.log("tried to select from a too-empty stack");
+                    return -1;
+                }
+                let cond = mod.stack.pop();
+                let var1 = mod.stack.pop();
+                let var2 = mod.stack.pop();
+                if (cond.type != int32_type) {
+                    console.log("invalid condition variable in select operation");
+                    return -1;
+                }
+                if (var1.type != var2.type) {
+                    console.log("mismatching value types in select operation");
+                    return -1;
+                }
+                if (cond.value == 0) {
+                    mod.stack.push(val2);
+                } else {
+                    mod.stack.push(val1);
+                }
+                code_ptr++;
+                break;
 
-			// memory instruction op codes
-			case i32_load_op_code:
-				//TODO
-				break;
-			case i64_load_op_code:
-				//TODO
-				break;
-			case f32_load_op_code:
-				//TODO
-				break;
-			case f64_load_op_code:
-				//TODO
-				break;
-			case i32_load8_s_op_code:
-				//TODO
-				break;
-			case i32_load8_u_op_code:
-				//TODO
-				break;
-			case i32_load16_s_op_code:
-				//TODO
-				break;
-			case i32_load16_u_op_code:
-				//TODO
-				break;
-			case i64_load8_s_op_code:
-				//TODO
-				break;
-			case i64_load8_u_op_code:
-				//TODO
-				break;
-			case i64_load16_s_op_code:
-				//TODO
-				break;
-			case i64_load16_u_op_code:
-				//TODO
-				break;
-			case i64_load32_s_op_code:
-				//TODO
-				break;
-			case i64_load32_u_op_code:
-				//TODO
-				break;
-			case i32_store_op_code:
-				//TODO
-				break;
-			case i64_store_op_code:
-				//TODO
-				break;
-			case f32_store_op_code:
-				//TODO
-				break;
-			case f64_store_op_code:
-				//TODO
-				break;
-			case i32_store8_op_code:
-				//TODO
-				break;
-			case i32_store16_op_code:
-				//TODO
-				break;
-			case i64_store8_op_code:
-				//TODO
-				break;
-			case i64_store16_op_code:
-				//TODO
-				break;
-			case i64_store32_op_code:
-				//TODO
-				break;
-			case current_memory_op_code:
-				//TODO
-				break;
-			case grow_memory_op_code:
-				//TODO
-				break;
+            // variable op codes
+            case get_local_op_code:
+                // get index
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let idx = decode.value;
+                if (func.locals.length <= idx) {
+                    console.log("Invalid local index");
+                    return -1;
+                }
+                mod.stack.push(func.locals[idx]);
+                break;
+            case set_local_op_code:
+                // get index
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let idx = decode.value;
+                if (func.locals.length <= idx) {
+                    console.log("Invalid local index");
+                    return -1;
+                }
 
-			// numeric op codes
-			case const_i32_op_code:
-				//TODO
-				break;
-			case const_i64_op_code:
-				//TODO
-				break;
-			case const_f32_op_code:
-				//TODO
-				break;
-			case const_f64_op_code:
-				//TODO
-				break;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in set local");
+                    return -1;
+                }
 
-			case i32_eqz_op_code:
-				//TODO
-				break;
-			case i32_eq_op_code:
-				//TODO
-				break;
-			case i32_ne_op_code:
-				//TODO
-				break;
-			case i32_lt_s_op_code:
-				//TODO
-				break;
-			case i32_lt_u_op_code:
-				//TODO
-				break;
-			case i32_gt_s_op_code:
-				//TODO
-				break;
-			case i32_gt_u_op_code:
-				//TODO
-				break;
-			case i32_le_s_op_code:
-				//TODO
-				break;
-			case i32_le_u_op_code:
-				//TODO
-				break;
-			case i32_ge_s_op_code:
-				//TODO
-				break;
-			case i32_ge_u_op_code:
-				//TODO
-				break;
+                func.locals[idx] = mod.stack.pop();
+                break;
+            case tee_local_op_code:
+                // get index
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let idx = decode.value;
+                if (func.locals.length <= idx) {
+                    console.log("Invalid local index");
+                    return -1;
+                }
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in tee local");
+                    return -1;
+                }
+                func.locals[idx] = mod.stack.pop();
+                mod.stack.push(func.local[idx]);
+                break;
+            case get_global_op_code:
+                // get index
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let idx = decode.value;
+                if (mod.globals.length <= idx) {
+                    console.log("Invalid global index");
+                    return -1;
+                }
+                let new_var = Variable(mod.globals[idx].type, mod.globals[idx].value);
+                mod.stack.push(new_var);
+                break;
+            case set_global_op_code:
+                // get index
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let idx = decode.value;
+                if (mod.globals.length <= idx) {
+                    console.log("Invalid global index");
+                    return -1;
+                }
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in set global");
+                    return -1;
+                }
+                if (!mod.globals[idx].mutable) {
+                    console.log("trying to set unmutable global");
+                    return -1;
+                }
+                mod.globals[idx].value = mod.stack.pop().value;
+                break;
 
-			case i64_eqz_op_code:
-				//TODO
-				break;
-			case i64_eq_op_code:
-				//TODO
-				break;
-			case i64_ne_op_code:
-				//TODO
-				break;
-			case i64_lt_s_op_code:
-				//TODO
-				break;
-			case i64_lt_u_op_code:
-				//TODO
-				break;
-			case i64_gt_s_op_code:
-				//TODO
-				break;
-			case i64_gt_u_op_code:
-				//TODO
-				break;
-			case i64_le_s_op_code:
-				//TODO
-				break;
-			case i64_le_u_op_code:
-				//TODO
-				break;
-			case i64_ge_s_op_code:
-				//TODO
-				break;
-			case i64_ge_u_op_code:
-				//TODO
-				break;
+            // memory instruction op codes
+            case i32_load_op_code:
+                //TODO
+                break;
+            case i64_load_op_code:
+                //TODO
+                break;
+            case f32_load_op_code:
+                //TODO
+                break;
+            case f64_load_op_code:
+                //TODO
+                break;
+            case i32_load8_s_op_code:
+                //TODO
+                break;
+            case i32_load8_u_op_code:
+                //TODO
+                break;
+            case i32_load16_s_op_code:
+                //TODO
+                break;
+            case i32_load16_u_op_code:
+                //TODO
+                break;
+            case i64_load8_s_op_code:
+                //TODO
+                break;
+            case i64_load8_u_op_code:
+                //TODO
+                break;
+            case i64_load16_s_op_code:
+                //TODO
+                break;
+            case i64_load16_u_op_code:
+                //TODO
+                break;
+            case i64_load32_s_op_code:
+                //TODO
+                break;
+            case i64_load32_u_op_code:
+                //TODO
+                break;
+            case i32_store_op_code:
+                //TODO
+                break;
+            case i64_store_op_code:
+                //TODO
+                break;
+            case f32_store_op_code:
+                //TODO
+                break;
+            case f64_store_op_code:
+                //TODO
+                break;
+            case i32_store8_op_code:
+                //TODO
+                break;
+            case i32_store16_op_code:
+                //TODO
+                break;
+            case i64_store8_op_code:
+                //TODO
+                break;
+            case i64_store16_op_code:
+                //TODO
+                break;
+            case i64_store32_op_code:
+                //TODO
+                break;
+            case current_memory_op_code:
+                //TODO
+                break;
+            case grow_memory_op_code:
+                //TODO
+                break;
 
-			case f32_eq_op_code:
-				//TODO
-				break;
-			case f32_ne_op_code:
-				//TODO
-				break;
-			case f32_lt_op_code:
-				//TODO
-				break;
-			case f32_gt_op_code:
-				//TODO
-				break;
-			case f32_le_op_code:
-				//TODO
-				break;
-			case f32_ge_op_code:
-				//TODO
-				break;
+            // numeric op codes
+            case const_i32_op_code:
+                //TODO
+                break;
+            case const_i64_op_code:
+                //TODO
+                break;
+            case const_f32_op_code:
+                //TODO
+                break;
+            case const_f64_op_code:
+                //TODO
+                break;
 
-			case f64_eq_op_code:
-				//TODO
-				break;
-			case f64_ne_op_code:
-				//TODO
-				break;
-			case f64_lt_op_code:
-				//TODO
-				break;
-			case f64_gt_op_code:
-				//TODO
-				break;
-			case f64_le_op_code:
-				//TODO
-				break;
-			case f64_ge_op_code:
-				//TODO
-				break;
+            case i32_eqz_op_code:
+                //TODO
+                break;
+            case i32_eq_op_code:
+                //TODO
+                break;
+            case i32_ne_op_code:
+                //TODO
+                break;
+            case i32_lt_s_op_code:
+                //TODO
+                break;
+            case i32_lt_u_op_code:
+                //TODO
+                break;
+            case i32_gt_s_op_code:
+                //TODO
+                break;
+            case i32_gt_u_op_code:
+                //TODO
+                break;
+            case i32_le_s_op_code:
+                //TODO
+                break;
+            case i32_le_u_op_code:
+                //TODO
+                break;
+            case i32_ge_s_op_code:
+                //TODO
+                break;
+            case i32_ge_u_op_code:
+                //TODO
+                break;
 
-			case i32_clz_op_code:
-				//TODO
-				break;
-			case i32_ctz_op_code:
-				//TODO
-				break;
-			case i32_popcnt_op_code:
-				//TODO
-				break;
-			case i32_add_op_code:
-				//TODO
-				break;
-			case i32_sub_op_code:
-				//TODO
-				break;
-			case i32_mul_op_code:
-				//TODO
-				break;
-			case i32_div_s_op_code:
-				//TODO
-				break;
-			case i32_div_u_op_code:
-				//TODO
-				break;
-			case i32_rem_s_op_code:
-				//TODO
-				break;
-			case i32_rem_u_op_code:
-				//TODO
-				break;
-			case i32_and_op_code:
-				//TODO
-				break;
-			case i32_or_op_code:
-				//TODO
-				break;
-			case i32_xor_op_code:
-				//TODO
-				break;
-			case i32_shl_op_code:
-				//TODO
-				break;
-			case i32_shr_s_op_code:
-				//TODO
-				break;
-			case i32_shr_u_op_code:
-				//TODO
-				break;
-			case i32_rotl_op_code:
-				//TODO
-				break;
-			case i32_rotr_op_code:
-				//TODO
-				break;
+            case i64_eqz_op_code:
+                //TODO
+                break;
+            case i64_eq_op_code:
+                //TODO
+                break;
+            case i64_ne_op_code:
+                //TODO
+                break;
+            case i64_lt_s_op_code:
+                //TODO
+                break;
+            case i64_lt_u_op_code:
+                //TODO
+                break;
+            case i64_gt_s_op_code:
+                //TODO
+                break;
+            case i64_gt_u_op_code:
+                //TODO
+                break;
+            case i64_le_s_op_code:
+                //TODO
+                break;
+            case i64_le_u_op_code:
+                //TODO
+                break;
+            case i64_ge_s_op_code:
+                //TODO
+                break;
+            case i64_ge_u_op_code:
+                //TODO
+                break;
 
-			case i64_clz_op_code:
-				//TODO
-				break;
-			case i64_ctz_op_code:
-				//TODO
-				break;
-			case i64_popcnt_op_code:
-				//TODO
-				break;
-			case i64_add_op_code:
-				//TODO
-				break;
-			case i64_sub_op_code:
-				//TODO
-				break;
-			case i64_mul_op_code:
-				//TODO
-				break;
-			case i64_div_s_op_code:
-				//TODO
-				break;
-			case i64_div_u_op_code:
-				//TODO
-				break;
-			case i64_rem_s_op_code:
-				//TODO
-				break;
-			case i64_rem_u_op_code:
-				//TODO
-				break;
-			case i64_and_op_code:
-				//TODO
-				break;
-			case i64_or_op_code:
-				//TODO
-				break;
-			case i64_xor_op_code:
-				//TODO
-				break;
-			case i64_shl_op_code:
-				//TODO
-				break;
-			case i64_shr_s_op_code:
-				//TODO
-				break;
-			case i64_shr_u_op_code:
-				//TODO
-				break;
-			case i64_rotl_op_code:
-				//TODO
-				break;
-			case i64_rotr_op_code:
-				//TODO
-				break;
+            case f32_eq_op_code:
+                //TODO
+                break;
+            case f32_ne_op_code:
+                //TODO
+                break;
+            case f32_lt_op_code:
+                //TODO
+                break;
+            case f32_gt_op_code:
+                //TODO
+                break;
+            case f32_le_op_code:
+                //TODO
+                break;
+            case f32_ge_op_code:
+                //TODO
+                break;
 
-			case f32_abs_op_code:
-				//TODO
-				break;
-			case f32_neg_op_code:
-				//TODO
-				break;
-			case f32_ceil_op_code:
-				//TODO
-				break;
-			case f32_floor_op_code:
-				//TODO
-				break;
-			case f32_trunc_op_code:
-				//TODO
-				break;
-			case f32_nearest_op_code:
-				//TODO
-				break;
-			case f32_sqrt_op_code:
-				//TODO
-				break;
-			case f32_add_op_code:
-				//TODO
-				break;
-			case f32_sub_op_code:
-				//TODO
-				break;
-			case f32_mul_op_code:
-				//TODO
-				break;
-			case f32_dic_op_code:
-				//TODO
-				break;
-			case f32_min_op_code:
-				//TODO
-				break;
-			case f32_max_op_code:
-				//TODO
-				break;
-			case f32_copysign_op_code:
-				//TODO
-				break;
+            case f64_eq_op_code:
+                //TODO
+                break;
+            case f64_ne_op_code:
+                //TODO
+                break;
+            case f64_lt_op_code:
+                //TODO
+                break;
+            case f64_gt_op_code:
+                //TODO
+                break;
+            case f64_le_op_code:
+                //TODO
+                break;
+            case f64_ge_op_code:
+                //TODO
+                break;
 
-			case f64_abs_op_code:
-				//TODO
-				break;
-			case f64_neg_op_code:
-				//TODO
-				break;
-			case f64_ceil_op_code:
-				//TODO
-				break;
-			case f64_floor_op_code:
-				//TODO
-				break;
-			case f64_trunc_op_code:
-				//TODO
-				break;
-			case f64_nearest_op_code:
-				//TODO
-				break;
-			case f64_sqrt_op_code:
-				//TODO
-				break;
-			case f64_add_op_code:
-				//TODO
-				break;
-			case f64_sub_op_code:
-				//TODO
-				break;
-			case f64_mul_op_code:
-				//TODO
-				break;
-			case f64_dic_op_code:
-				//TODO
-				break;
-			case f64_min_op_code:
-				//TODO
-				break;
-			case f64_max_op_code:
-				//TODO
-				break;
-			case f64_copysign_op_code:
-				//TODO
-				break;
+            case i32_clz_op_code:
+                //TODO
+                break;
+            case i32_ctz_op_code:
+                //TODO
+                break;
+            case i32_popcnt_op_code:
+                //TODO
+                break;
+            case i32_add_op_code:
+                //TODO
+                break;
+            case i32_sub_op_code:
+                //TODO
+                break;
+            case i32_mul_op_code:
+                //TODO
+                break;
+            case i32_div_s_op_code:
+                //TODO
+                break;
+            case i32_div_u_op_code:
+                //TODO
+                break;
+            case i32_rem_s_op_code:
+                //TODO
+                break;
+            case i32_rem_u_op_code:
+                //TODO
+                break;
+            case i32_and_op_code:
+                //TODO
+                break;
+            case i32_or_op_code:
+                //TODO
+                break;
+            case i32_xor_op_code:
+                //TODO
+                break;
+            case i32_shl_op_code:
+                //TODO
+                break;
+            case i32_shr_s_op_code:
+                //TODO
+                break;
+            case i32_shr_u_op_code:
+                //TODO
+                break;
+            case i32_rotl_op_code:
+                //TODO
+                break;
+            case i32_rotr_op_code:
+                //TODO
+                break;
 
-			case i32_wrap_i64_op_code:
-				//TODO
-				break;
-			case i32_trunc_s_f32_op_code:
-				//TODO
-				break;
-			case i32_trunc_u_f32_op_code:
-				//TODO
-				break;
-			case i32_trunc_s_f64_op_code:
-				//TODO
-				break;
-			case i32_trunc_u_f64_op_code:
-				//TODO
-				break;
-			case i64_extend_s_i32_op_code:
-				//TODO
-				break;
-			case i64_extend_u_i32_op_code:
-				//TODO
-				break;
-			case i64_trunc_s_f32_op_code:
-				//TODO
-				break;
-			case i64_trunc_u_f32_op_code:
-				//TODO
-				break;
-			case i64_trunc_s_f64_op_code:
-				//TODO
-				break;
-			case i64_trunc_u_f64_op_code:
-				//TODO
-				break;
-			case f32_convert_s_i32_op_code:
-				//TODO
-				break;
-			case f32_convert_u_i32_op_code:
-				//TODO
-				break;
-			case f32_convert_s_i64_op_code:
-				//TODO
-				break;
-			case f32_convert_u_i64_op_code:
-				//TODO
-				break;
-			case f32_denote_f64_op_code:
-				//TODO
-				break;
-			case f64_convert_s_i32_op_code:
-				//TODO
-				break;
-			case f64_convert_u_i32_op_code:
-				//TODO
-				break;
-			case f64_convert_s_i64_op_code:
-				//TODO
-				break;
-			case f64_convert_u_i64_op_code:
-				//TODO
-				break;
-			case f64_promote_f32_op_code:
-				//TODO
-				break;
-			case i32_reinterpret_f32_op_code:
-				//TODO
-				break;
-			case i64_reinterpret_f64_op_code:
-				//TODO
-				break;
-			case f32_reinterpret_i32_op_code:
-				//TODO
-				break;
-			case f64_reinterpret_i64_op_code:
-				//TODO
-				break;
+            case i64_clz_op_code:
+                //TODO
+                break;
+            case i64_ctz_op_code:
+                //TODO
+                break;
+            case i64_popcnt_op_code:
+                //TODO
+                break;
+            case i64_add_op_code:
+                //TODO
+                break;
+            case i64_sub_op_code:
+                //TODO
+                break;
+            case i64_mul_op_code:
+                //TODO
+                break;
+            case i64_div_s_op_code:
+                //TODO
+                break;
+            case i64_div_u_op_code:
+                //TODO
+                break;
+            case i64_rem_s_op_code:
+                //TODO
+                break;
+            case i64_rem_u_op_code:
+                //TODO
+                break;
+            case i64_and_op_code:
+                //TODO
+                break;
+            case i64_or_op_code:
+                //TODO
+                break;
+            case i64_xor_op_code:
+                //TODO
+                break;
+            case i64_shl_op_code:
+                //TODO
+                break;
+            case i64_shr_s_op_code:
+                //TODO
+                break;
+            case i64_shr_u_op_code:
+                //TODO
+                break;
+            case i64_rotl_op_code:
+                //TODO
+                break;
+            case i64_rotr_op_code:
+                //TODO
+                break;
+
+            case f32_abs_op_code:
+                //TODO
+                break;
+            case f32_neg_op_code:
+                //TODO
+                break;
+            case f32_ceil_op_code:
+                //TODO
+                break;
+            case f32_floor_op_code:
+                //TODO
+                break;
+            case f32_trunc_op_code:
+                //TODO
+                break;
+            case f32_nearest_op_code:
+                //TODO
+                break;
+            case f32_sqrt_op_code:
+                //TODO
+                break;
+            case f32_add_op_code:
+                //TODO
+                break;
+            case f32_sub_op_code:
+                //TODO
+                break;
+            case f32_mul_op_code:
+                //TODO
+                break;
+            case f32_dic_op_code:
+                //TODO
+                break;
+            case f32_min_op_code:
+                //TODO
+                break;
+            case f32_max_op_code:
+                //TODO
+                break;
+            case f32_copysign_op_code:
+                //TODO
+                break;
+
+            case f64_abs_op_code:
+                //TODO
+                break;
+            case f64_neg_op_code:
+                //TODO
+                break;
+            case f64_ceil_op_code:
+                //TODO
+                break;
+            case f64_floor_op_code:
+                //TODO
+                break;
+            case f64_trunc_op_code:
+                //TODO
+                break;
+            case f64_nearest_op_code:
+                //TODO
+                break;
+            case f64_sqrt_op_code:
+                //TODO
+                break;
+            case f64_add_op_code:
+                //TODO
+                break;
+            case f64_sub_op_code:
+                //TODO
+                break;
+            case f64_mul_op_code:
+                //TODO
+                break;
+            case f64_dic_op_code:
+                //TODO
+                break;
+            case f64_min_op_code:
+                //TODO
+                break;
+            case f64_max_op_code:
+                //TODO
+                break;
+            case f64_copysign_op_code:
+                //TODO
+                break;
+
+            case i32_wrap_i64_op_code:
+                //TODO
+                break;
+            case i32_trunc_s_f32_op_code:
+                //TODO
+                break;
+            case i32_trunc_u_f32_op_code:
+                //TODO
+                break;
+            case i32_trunc_s_f64_op_code:
+                //TODO
+                break;
+            case i32_trunc_u_f64_op_code:
+                //TODO
+                break;
+            case i64_extend_s_i32_op_code:
+                //TODO
+                break;
+            case i64_extend_u_i32_op_code:
+                //TODO
+                break;
+            case i64_trunc_s_f32_op_code:
+                //TODO
+                break;
+            case i64_trunc_u_f32_op_code:
+                //TODO
+                break;
+            case i64_trunc_s_f64_op_code:
+                //TODO
+                break;
+            case i64_trunc_u_f64_op_code:
+                //TODO
+                break;
+            case f32_convert_s_i32_op_code:
+                //TODO
+                break;
+            case f32_convert_u_i32_op_code:
+                //TODO
+                break;
+            case f32_convert_s_i64_op_code:
+                //TODO
+                break;
+            case f32_convert_u_i64_op_code:
+                //TODO
+                break;
+            case f32_denote_f64_op_code:
+                //TODO
+                break;
+            case f64_convert_s_i32_op_code:
+                //TODO
+                break;
+            case f64_convert_u_i32_op_code:
+                //TODO
+                break;
+            case f64_convert_s_i64_op_code:
+                //TODO
+                break;
+            case f64_convert_u_i64_op_code:
+                //TODO
+                break;
+            case f64_promote_f32_op_code:
+                //TODO
+                break;
+            case i32_reinterpret_f32_op_code:
+                //TODO
+                break;
+            case i64_reinterpret_f64_op_code:
+                //TODO
+                break;
+            case f32_reinterpret_i32_op_code:
+                //TODO
+                break;
+            case f64_reinterpret_i64_op_code:
+                //TODO
+                break;
         }
     }
 

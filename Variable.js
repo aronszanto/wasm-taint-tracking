@@ -1,7 +1,7 @@
 class Variable {
-    constructor(type) {
+    constructor(type, value = null) {
         this.type = type;
-        this.value = null;
+        this.value = value;
     }
 }
 
