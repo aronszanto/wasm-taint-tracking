@@ -398,12 +398,12 @@ function build_module(byte_code) {
                         console.log("issue with table type, can only be anyfunc");
                         return -1;
                     }
-                    
+
                     // get resizable limits, first the flag
                     let flags = byte_code[i];
                     i++;
 
-                    // get minimum, always has minimum 
+                    // get minimum, always has minimum
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let min_size = decode.value;
@@ -416,7 +416,7 @@ function build_module(byte_code) {
                         max_size = decode.value;
                     }
 
-                    // construct table 
+                    // construct table
                     tables.push(new TableInstance(type, min_size, max_size, []));
                 }
 
@@ -590,7 +590,7 @@ function build_module(byte_code) {
 
                 // get table initializer
                 for (let j = 0; j < num_els; j++) {
-                    // get table index 
+                    // get table index
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let table_index = decode.value;
@@ -606,7 +606,7 @@ function build_module(byte_code) {
                     i = decode.nextIndex;
                     len = decode.value;
 
-                    // sanity check: 
+                    // sanity check:
                     if (offset + len > tables[table_index].max_size) {
                         console.log("table element indexing issue");
                         return -1;
@@ -619,7 +619,7 @@ function build_module(byte_code) {
                         func_index = decode.value;
 
                         // store func index at offset in element list
-                        tables[table_index].elements[offset + k] = func_index; 
+                        tables[table_index].elements[offset + k] = func_index;
                     }
                 }
 
@@ -759,9 +759,9 @@ function run_function(mod, function_idx, params) {
         mod.stack.push(el);
     });
 
-    
+
     let labels = [];
-    
+
     // execute the code
     let code_ptr = 0;
     while (code_ptr < func.code.length) {
@@ -841,7 +841,7 @@ function run_function(mod, function_idx, params) {
                 }
                 break;
             case else_op_code:
-                //TODO: remove label from labels and validate 
+                //TODO: remove label from labels and validate
                 // skip until end
                 while (func.code[code_ptr] != expression_end_code) {
                     code_ptr++;
@@ -849,7 +849,7 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 break;
             case expression_end_code:
-                //TODO: remove label from labels and validate 
+                //TODO: remove label from labels and validate
                 break;
             case br_op_code:
                 //TODO
@@ -988,11 +988,11 @@ function run_function(mod, function_idx, params) {
                 //TODO
                 break;
             case f32_load_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_load_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_load8_s_op_code:
                 //TODO
                 break;
@@ -1030,11 +1030,11 @@ function run_function(mod, function_idx, params) {
                 //TODO
                 break;
             case f32_store_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_store_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_store8_op_code:
                 //TODO
                 break;
@@ -1065,12 +1065,11 @@ function run_function(mod, function_idx, params) {
                 //TODO
                 break;
             case const_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case const_f64_op_code:
-                //TODO
-                break;
-
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_eqz_op_code:
                 //TODO
                 break;
@@ -1140,42 +1139,42 @@ function run_function(mod, function_idx, params) {
                 break;
 
             case f32_eq_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_ne_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_lt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_gt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_le_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_ge_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
 
             case f64_eq_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_ne_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_lt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_gt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_le_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_ge_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
 
             case i32_clz_op_code:
                 //TODO
@@ -1288,106 +1287,106 @@ function run_function(mod, function_idx, params) {
                 break;
 
             case f32_abs_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_neg_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_ceil_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_floor_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_trunc_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_nearest_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_sqrt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_add_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_sub_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_mul_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_dic_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_min_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_max_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_copysign_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
 
             case f64_abs_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_neg_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_ceil_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_floor_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_trunc_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_nearest_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_sqrt_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_add_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_sub_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_mul_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_dic_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_min_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_max_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_copysign_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
 
             case i32_wrap_i64_op_code:
                 //TODO
                 break;
             case i32_trunc_s_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_trunc_u_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_trunc_s_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_trunc_u_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i64_extend_s_i32_op_code:
                 //TODO
                 break;
@@ -1395,59 +1394,59 @@ function run_function(mod, function_idx, params) {
                 //TODO
                 break;
             case i64_trunc_s_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i64_trunc_u_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i64_trunc_s_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i64_trunc_u_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_convert_s_i32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_convert_u_i32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_convert_s_i64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_convert_u_i64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_denote_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_convert_s_i32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_convert_u_i32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_convert_s_i64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_convert_u_i64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_promote_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i32_reinterpret_f32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case i64_reinterpret_f64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f32_reinterpret_i32_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
             case f64_reinterpret_i64_op_code:
-                //TODO
-                break;
+                console.log("floating point operations are not supported");
+                return -1;
         }
     }
 
