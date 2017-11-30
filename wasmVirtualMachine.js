@@ -8,6 +8,7 @@ const TableInstance = require('./TableInstance');
 const Limit = require('./Limit');
 const Variable = require('./Variable');
 const Leb = require('leb');
+const Utf8StringBytes = require("utf8-string-bytes");
 
 const custom_section_id = 0;
 const type_section_id = 1;
@@ -385,19 +386,18 @@ function build_module(byte_code) {
                 // get table description
                 for (let j = 0; j < num_els; j++) {
                     // table element type
-                    type = byte_code[i];
+                    let type = byte_code[i];
                     i++;
 
-                    // // sanity check
-                    // if (type != -0x10) {
-                    //     console.log("issue with table type, can only be anyfunc");
-                    //     return -1;
-                    // }
+                    // sanity check
+                    if (type != 0x70) {
+                        console.log("issue with table type, can only be anyfunc");
+                        return -1;
+                    }
                     
                     // get resizable limits, first the flag
-                    decode = Leb.decodeUint32(byte_code, i);
-                    i = decode.nextIndex;
-                    let flags = decode.value;
+                    let flags = byte_code[i];
+                    i++;
 
                     // get minimum, always has minimum 
                     decode = Leb.decodeUint32(byte_code, i);
@@ -406,7 +406,7 @@ function build_module(byte_code) {
 
                     // if bit 0x1 is set in flags get maximum
                     let max_size = undefined;
-                    if (flags % 2 == 1) {
+                    if (flags == 1) {
                         decode = Leb.decodeUint32(byte_code, i);
                         i = decode.nextIndex;
                         max_size = decode.value;
@@ -415,7 +415,7 @@ function build_module(byte_code) {
                     // construct table 
                     tables.push(new TableInstance(type, min_size, max_size, []));
                 }
-                
+
                 // sanity check
                 if (expected_end != i) {
                     console.log("alignment issue when parsing");
@@ -481,9 +481,8 @@ function build_module(byte_code) {
                 // get global
                 for (let j = 0; j < num_els; j++) {
                     // get global description (type and mutability, mut is 0 or 1)
-                    decode = Leb.decodeUint32(byte_code, i);
-                    i = decode.nextIndex;
-                    let type = decode.value;
+                    let type = byte_code[i];
+                    i++;
 
                     // no need to decode since varuint1 (only one byte)
                     let mut = byte_code[i];
@@ -521,15 +520,18 @@ function build_module(byte_code) {
                 // get export instance
                 for (let j = 0; j < num_els; j++) {
                     // get name (identifier: byte array wich is valid UTF-8)
-                    let name = [];
+                    let name_byte_array = [];
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
                     let len = decode.value;
 
                     for (let k = 0; k < len; k++) {
-                        name.push(byte_code[i]);
+                        name_byte_array.push(byte_code[i]);
                         i++;
                     }
+
+                    // decode byte array to string
+                    let name = Utf8StringBytes.utf8ByteArrayToString(name_byte_array);
 
                     // get export kind (func, table, mem or global)
                     let kind = byte_code[i];
@@ -587,7 +589,7 @@ function build_module(byte_code) {
                     // get table index 
                     decode = Leb.decodeUint32(byte_code, i);
                     i = decode.nextIndex;
-                    table_index = decode.value;
+                    let table_index = decode.value;
 
                     // get offset
                     let offset;
