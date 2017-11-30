@@ -2,9 +2,13 @@ const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
 const FunctionInstance = require('./FunctionInstance');
 const FunctionType = require('./FunctionType');
+const GlobalInstance = require('./GlobalInstance');
+const ExportInstance = require('./ExportInstance');
+const TableInstance = require('./TableInstance');
 const Limit = require('./Limit');
 const Variable = require('./Variable');
 const Leb = require('leb');
+const Utf8StringBytes = require("utf8-string-bytes");
 
 const custom_section_id = 0;
 const type_section_id = 1;
@@ -360,9 +364,9 @@ function build_module(byte_code) {
                 // get type_idx
                 let type_idxs = []
                 for (let j = 0; j < num_els; j++) {
-                    let decoded_typeidx= Leb.decodeUint32(byte_code, i);
+                    let decoded_typeidx = Leb.decodeUint32(byte_code, i);
                     i = decoded_params.nextIndex;
-                    func_type_idxs.push(decoded_typeidx);
+                    func_type_idxs.push(decoded_typeidx.value);
                 }
 
                 // sanity check
@@ -376,10 +380,54 @@ function build_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of table descriptions
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get table description
+                for (let j = 0; j < num_els; j++) {
+                    // table element type
+                    let type = byte_code[i];
+                    i++;
+
+                    // sanity check
+                    if (type != 0x70) {
+                        console.log("issue with table type, can only be anyfunc");
+                        return -1;
+                    }
+                    
+                    // get resizable limits, first the flag
+                    let flags = byte_code[i];
+                    i++;
+
+                    // get minimum, always has minimum 
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let min_size = decode.value;
+
+                    // if bit 0x1 is set in flags get maximum
+                    let max_size = undefined;
+                    if (flags == 1) {
+                        decode = Leb.decodeUint32(byte_code, i);
+                        i = decode.nextIndex;
+                        max_size = decode.value;
+                    }
+
+                    // construct table 
+                    tables.push(new TableInstance(type, min_size, max_size, []));
+                }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
+
 
             case memory_section_id:
                 i++;
@@ -427,18 +475,87 @@ function build_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of globals
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get global
+                for (let j = 0; j < num_els; j++) {
+                    // get global description (type and mutability, mut is 0 or 1)
+                    let type = byte_code[i];
+                    i++;
+
+                    // no need to decode since varuint1 (only one byte)
+                    let mut = byte_code[i];
+                    i++;
+
+                    // evaluate initializer expression can be either get_global or const
+                    let init_value;
+                    let ret = parse_init_expression(byte_code, i);
+                    init_value = ret.value;
+                    i = ret.nextIndex;
+
+                    // construct global
+                    globals.push(new GlobalInstance(type, init_value, mut));
+                }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case export_section_id:
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of exports
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get export instance
+                for (let j = 0; j < num_els; j++) {
+                    // get name (identifier: byte array wich is valid UTF-8)
+                    let name_byte_array = [];
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let len = decode.value;
+
+                    for (let k = 0; k < len; k++) {
+                        name_byte_array.push(byte_code[i]);
+                        i++;
+                    }
+
+                    // decode byte array to string
+                    let name = Utf8StringBytes.utf8ByteArrayToString(name_byte_array);
+
+                    // get export kind (func, table, mem or global)
+                    let kind = byte_code[i];
+                    i++;
+
+                    // get index (address in list of kind)
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let index = decode.value;
+
+                    // construct export
+                    exports.push(new ExportInstance(name, kind, index));
+                }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case start_section_id:
@@ -464,9 +581,53 @@ function build_module(byte_code) {
                 i++;
                 decode = Leb.decodeUint32(byte_code, i);
                 i = decode.nextIndex;
-                size = decode.value;
+                expected_end = i + decode.value;
 
-                // TODO
+                // get array of table initializers
+                decode = Leb.decodeUint32(byte_code, i);
+                i = decode.nextIndex;
+                num_els = decode.value;
+
+                // get table initializer
+                for (let j = 0; j < num_els; j++) {
+                    // get table index 
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    let table_index = decode.value;
+
+                    // get offset
+                    let offset;
+                    let ret = parse_init_expression(byte_code, i);
+                    offset = ret.value;
+                    i = ret.nextIndex;
+
+                    // get elements (array of function indices)
+                    decode = Leb.decodeUint32(byte_code, i);
+                    i = decode.nextIndex;
+                    len = decode.value;
+
+                    // sanity check: 
+                    if (offset + len > tables[table_index].max_size) {
+                        console.log("table element indexing issue");
+                        return -1;
+                    }
+
+                    for (let k = 0; k < len; k++) {
+                        // get func index
+                        decode = Leb.decodeUint32(byte_code, i);
+                        i = decode.nextIndex;
+                        func_index = decode.value;
+
+                        // store func index at offset in element list
+                        tables[table_index].elements[offset + k] = func_index; 
+                    }
+                }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
                 break;
 
             case code_section_id:
@@ -515,6 +676,13 @@ function build_module(byte_code) {
                     }
                     funcs.push(new FunctionInstance(types[func_type_idxs[j]], locals, code));
                 }
+
+                // sanity check
+                if (expected_end != i) {
+                    console.log("alignment issue when parsing");
+                    return -1;
+                }
+
                 break;
 
             case data_section_id:

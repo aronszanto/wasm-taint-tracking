@@ -1,7 +1,8 @@
 class ExportInstance {
-    constructor(name, value) {
+    constructor(name, kind, index) {
         this.name = name;
-        this.value = value;
+        this.kind = kind;
+        this.index = index;
     }
 }
 
