@@ -1,0 +1,1 @@
+const VM = require('./wasmVirtualMachine');
