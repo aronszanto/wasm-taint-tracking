@@ -1009,7 +1009,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1028,6 +1028,7 @@ function run_function(mod, function_idx, params) {
                 let new_var = Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
+
             case i64_load_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1055,7 +1056,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1067,7 +1068,11 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 // read buffer with little endian storage 
-                let c = new Int64Buffer.Uint64LE(b);
+                let opt = {
+                    endiam : 'little',
+                    size : 1
+                };
+                let c = Bignum.fromBuffer(b, opt);
 
                 // push loaded value to the stack
                 let new_var = Variable(int64_type, c);
@@ -1107,7 +1112,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1119,12 +1124,16 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 let dataView = new DataView(b.buffer);
-                let c = dataView.getInt8(true);
+                let c = dataView.getUint8(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
 
                 // push loaded value to the stack
                 let new_var = Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
+
             case i32_load8_u_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1152,7 +1161,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1170,6 +1179,7 @@ function run_function(mod, function_idx, params) {
                 let new_var = Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
+
             case i32_load16_s_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1197,7 +1207,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1209,12 +1219,15 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 let dataView = new DataView(b.buffer);
-                let c = dataView.getInt16(true);
-
+                let c = dataView.getUint16(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
                 // push loaded value to the stack
                 let new_var = Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
+
             case i32_load16_u_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1242,7 +1255,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1260,6 +1273,7 @@ function run_function(mod, function_idx, params) {
                 let new_var = Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
+
             case i64_load8_s_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1287,7 +1301,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1299,12 +1313,17 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 let dataView = new DataView(b.buffer);
-                let c = dataView.getInt8(true);
+                let c = dataView.getUint8(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i64_load8_u_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1332,7 +1351,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1347,9 +1366,10 @@ function run_function(mod, function_idx, params) {
                 let c = dataView.getUint8(true);
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i64_load16_s_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1377,7 +1397,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1389,12 +1409,16 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 let dataView = new DataView(b.buffer);
-                let c = dataView.getInt16(true);
+                let c = dataView.getUint16(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i64_load16_u_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1422,7 +1446,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1437,9 +1461,10 @@ function run_function(mod, function_idx, params) {
                 let c = dataView.getUint16(true);
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i64_load32_s_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1467,7 +1492,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1479,12 +1504,16 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 let b = mem.slice(ea, ea + N/8);
                 let dataView = new DataView(b.buffer);
-                let c = dataView.getInt32(true);
+                let c = dataView.getUint32(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i64_load32_u_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1512,7 +1541,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during load");
                     return -1;
                 }
@@ -1527,9 +1556,10 @@ function run_function(mod, function_idx, params) {
                 let c = dataView.getUint32(true);
 
                 // push loaded value to the stack
-                let new_var = Variable(int64_type, c);
+                let new_var = Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
+
             case i32_store_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1563,7 +1593,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1575,7 +1605,7 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt32(0, c.value, true);
+                dataView.setUint32(0, c.value, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
@@ -1619,7 +1649,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1679,7 +1709,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1692,7 +1722,7 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt8(0, n, true);   // TODO: is this correct or should it setUint?
+                dataView.setUint8(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
@@ -1733,7 +1763,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1746,7 +1776,7 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt16(0, n, true);   // TODO: is this correct or should it setUint?
+                dataView.setUint16(0, n, true);  
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
@@ -1791,7 +1821,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1804,13 +1834,14 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt8(0, n, true);   // TODO: is this correct or should it setUint?
+                dataView.setUint8(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
                     mem[ea + j] = b[j];
                 }
                 break;
+                
             case i64_store16_op_code:
                 // get memarg, start with offset
                 decode = Leb.decodeUint32(func.code, code_ptr);
@@ -1848,7 +1879,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1861,7 +1892,7 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt16(0, n, true);   // TODO: is this correct or should it setUint?
+                dataView.setUint16(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
@@ -1906,7 +1937,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let ea = i.value + offset;
-                if (ea % 2**align != 0) {
+                if (ea % Math.pow(2, align) != 0) {
                     console.log("alignment issue during store");
                     return -1;
                 }
@@ -1919,7 +1950,7 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 let b = new Uint8Array(N/8);
                 let dataView = new DataView(b.buffer);
-                dataView.setInt32(0, n, true);   // TODO: is this correct or should it setUint?
+                dataView.setUint32(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
