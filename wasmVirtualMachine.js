@@ -747,7 +747,7 @@ function run_function(mod, function_idx, params) {
         return -1;
     }
 
-    for (int i = 0; i < params.length; i++) {
+    for (i = 0; i < params.length; i++) {
         if (params[i].type != func.type.params[i]) {
             console.log("Invalid parameter type for function " + function_idx + ". expected: "
                 + func.type.params[i] + ". Got: " + params[i].type + ".");
@@ -2636,7 +2636,7 @@ function run_function(mod, function_idx, params) {
 
     // pop the return values
     rets = [];
-    for (int i = 0; i < func.type.returns.length; i++) {
+    for (i = 0; i < func.type.returns.length; i++) {
         ret = mod.stack.pop();
         if (ret.type != func.type.returns[i]) {
             console.log("invalid return type");
