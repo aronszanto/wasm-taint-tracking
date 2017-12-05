@@ -9,6 +9,7 @@ const Limit = require('./Limit');
 const Variable = require('./Variable');
 const Leb = require('leb');
 const Utf8StringBytes = require("utf8-string-bytes");
+const Bignum = require("bignum");
 
 const custom_section_id = 0;
 const type_section_id = 1;
@@ -748,7 +749,7 @@ function run_function(mod, function_idx, params) {
         return -1;
     }
 
-    for (int i = 0; i < params.length; i++) {
+    for (i = 0; i < params.length; i++) {
         if (params[i].type != func.type.params[i]) {
             console.log("Invalid parameter type for function " + function_idx + ". expected: "
                 + func.type.params[i] + ". Got: " + params[i].type + ".");
@@ -1164,6 +1165,13 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
+                // sanity check
+                if (func.code[code_ptr] != 0x00) {
+                    console.log("malformed call indirect code");
+                    return -1;
+                }
+                code_ptr++;
+
                 let table_idx = mod.stack.pop();
                 if (table_idx.type != int32_type) {
                     console.log("invalid table index on top of stack in call indirect");
@@ -1325,11 +1333,102 @@ function run_function(mod, function_idx, params) {
 
             // memory instruction op codes
             case i32_load_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 32;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                // read buffer with little endian storage 
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint32(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int32_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case i64_load_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 64;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                // read buffer with little endian storage 
+                let opt = {
+                    endian : 'little',
+                    size : 1
+                };
+                let c = Bignum.fromBuffer(b, opt);
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case f32_load_op_code:
                 console.log("floating point operations are not supported");
                 return -1;
@@ -1337,40 +1436,589 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i32_load8_s_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint8(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+
+                // push loaded value to the stack
+                let new_var = Variable(int32_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case i32_load8_u_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint8(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int32_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case i32_load16_s_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint16(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+                // push loaded value to the stack
+                let new_var = Variable(int32_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case i32_load16_u_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint16(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int32_type, c);
+                mod.stack.push(new_var);
                 break;
+
             case i64_load8_s_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint8(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i64_load8_u_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint8(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i64_load16_s_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint16(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i64_load16_u_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint16(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i64_load32_s_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 32;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint32(true);
+                if (c > Math.pow(2, 32)) {
+                    c -= Math.pow(2, 32);
+                }
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i64_load32_u_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in load op");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during load");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during load");
+                    return -1;
+                }
+                let N = 32;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr");
+                    return -1;
+                }
+                // read memory
+                let b = mem.slice(ea, ea + N/8);
+                let dataView = new DataView(b.buffer);
+                let c = dataView.getUint32(true);
+
+                // push loaded value to the stack
+                let new_var = Variable(int64_type, Bignum.bignum(c));
+                mod.stack.push(new_var);
                 break;
+
             case i32_store_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 32;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint32(0, c.value, true);
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
             case i64_store_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                if (!Bignum.isBigNum(c.value)) {
+                    console.log("expecting bignum on stack in store 64");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 64;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                // write buffer
+                let opt = {
+                    endian : 'little',
+                    size : 1
+                };
+                let b = c.toBuffer(opt);
+                
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
             case f32_store_op_code:
                 console.log("floating point operations are not supported");
@@ -1379,25 +2027,330 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i32_store8_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                let n = c.value % 2**N;
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint8(0, n, true);
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
+
             case i32_store16_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                let n = c.value % 2**N;
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint16(0, n, true);  
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
+
             case i64_store8_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int64_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                if (!Bignum.isBigNum(c.value)) {
+                    console.log("expecting bignum on stack in store 64");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 8;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                let n = c.value.mod(2**N).toNumber();
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint8(0, n, true);
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
+                
             case i64_store16_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                if (!Bignum.isBigNum(c.value)) {
+                    console.log("expecting bignum on stack in store 64");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int64_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 16;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                let n = c.value.mod(2**N).toNumber();
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint16(0, n, true);
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
+
             case i64_store32_op_code:
-                //TODO
+                // get memarg, start with offset
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let offset = decode.value;
+                // then get align
+                decode = Leb.decodeUint32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                let align = decode.value;
+
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                if (mod.stack.len() <= 1) {
+                    console.log("Empty stack in store op");
+                    return -1;
+                }
+                // get value to be stored from stack
+                let c = mod.stack.pop();
+                if (c.type != int64_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                if (!Bignum.isBigNum(c.value)) {
+                    console.log("expecting bignum on stack in store 64");
+                    return -1;
+                }
+                // get mem idx from stack
+                let i = mod.stack.pop();
+                if (i.type != int32_type) {
+                    console.log("mismatching type in stack variable during store");
+                    return -1;
+                }
+                let ea = i.value + offset;
+                if (ea % Math.pow(2, align) != 0) {
+                    console.log("alignment issue during store");
+                    return -1;
+                }
+                let N = 32;
+                if (ea + N/8 > mem.len()) {
+                    console.log("trying to read unset memory addr during store");
+                    return -1;
+                }
+                let n = c.value.mod(2**N).toNumber();
+                // write buffer
+                let b = new Uint8Array(N/8);
+                let dataView = new DataView(b.buffer);
+                dataView.setUint32(0, n, true);
+
+                // store buffer to memory
+                for (let j = 0; j < N/8; j++) {
+                    mem[ea + j] = b[j];
+                }
                 break;
+
             case current_memory_op_code:
-                //TODO
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+
+                let sz = mem.len() / MemoryInstance.page_size;  // defined in memory instancce
+
+                // push size to the stack
+                let new_var = Variable(int32_type, sz);
+                mod.stack.push(new_var);
                 break;
+                
             case grow_memory_op_code:
-                //TODO
+                // get memory instance
+                if (!mod.memories[0]) {
+                    console.log("trying to read unset memory instace");
+                    return -1;
+                }
+                let mem = mod.memories[0].bytes;
+                let sz = mem.len() / MemoryInstance.page_size;  // defined in memory instancce
+
+                if (mod.stack.len() <= 0) {
+                    console.log("Empty stack in grow mem op");
+                    return -1;
+                }
+                // get size of memory growth from stack
+                let n = mod.stack.pop();
+                if (n.type != int32_type) {
+                    console.log("mismatching type in stack variable during grow mem");
+                    return -1;
+                }
+                // extend the memory
+                mem.length += n * MemoryInstance.page_size;
+
+                // TODO check if the operation was successful above, for the moment we assume ok
+
+                // push size to the stack
+                let new_var = Variable(int32_type, sz);
+                mod.stack.push(new_var);
+
                 break;
 
             // numeric op codes

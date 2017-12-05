@@ -1,5 +1,5 @@
 class GlobalInstance {
-    constructor(type, value, mutable = true {
+    constructor(type, value, mutable = true) {
     	this.type = type;
         this.value = value;
         this.mutable = mutable;
