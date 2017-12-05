@@ -732,6 +732,7 @@ function build_module(byte_code) {
     }
 
     let module = new ModuleInstance(types, funcAddrs, tableAddrs, memAddrs, globalAddrs, module_exports);
+    return module;
 }
 
 // mod is of type ModuleInstance
