@@ -242,11 +242,13 @@ function parse_init_expression(byte_code, i) {
     let ret;
     switch(byte_code[i]) {
         case const_i32_op_code:
+            i++;
             decode = Leb.decodeInt32(byte_code, i);
             i = decode.nextIndex;
             ret = decode.value;
             break;
         case const_i64_op_code:
+            i++;
             decode = Leb.decodeInt64(byte_code, i);
             i = decode.nextIndex;
             ret = decode.value;
@@ -256,11 +258,17 @@ function parse_init_expression(byte_code, i) {
             console.log("floating point operations not supported");
             return -1;
         case get_global_op_code:
-            decode = Leb.decodeUint32(byte_code, i);
+            i++;
+            decode = Leb.decodeUInt32(byte_code, i);
             i = decode.nextIndex;
             ret = globals[decode.value].value;
             break;
     }
+    if (byte_code[i] != expression_end_code){
+        console.log('invalid end of expression when parsing instruction sequence');
+        return -1;
+    }
+    i++;
     return {
         value: ret,
         nextIndex: i
@@ -273,7 +281,7 @@ function build_module(byte_code) {
     // parse byte_code to module instance
     let i = 0;
     // check magic value
-    if (byte_code[i] != 0x00 || byte_code[i+1] != 0x61 ||  byte_code[i+1] != 0x73 || byte_code[i+1] != 0x6D) {
+    if (byte_code[i] != 0x00 || byte_code[i+1] != 0x61 ||  byte_code[i+2] != 0x73 || byte_code[i+3] != 0x6D) {
         console.log("Malformed module");
         return -1;
     }
@@ -289,7 +297,7 @@ function build_module(byte_code) {
         switch(byte_code[i]) {
             case custom_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 size = decode.value;
                 // ignore for now
@@ -298,11 +306,11 @@ function build_module(byte_code) {
 
             case type_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
@@ -314,7 +322,7 @@ function build_module(byte_code) {
                     return -1;
                   }
                   i++;
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let num_params = decode.value;
                     params = [];
@@ -322,7 +330,7 @@ function build_module(byte_code) {
                       params.push(byte_code[i]);
                       i++;
                     }
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let num_rets = decode.value;
                     let rets = [];
@@ -342,7 +350,7 @@ function build_module(byte_code) {
 
             case import_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 size = decode.value;
 
@@ -352,20 +360,20 @@ function build_module(byte_code) {
 
             case function_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get vector of values
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
                 // get type_idx
                 let type_idxs = []
                 for (let j = 0; j < num_els; j++) {
-                    let decoded_typeidx = Leb.decodeUint32(byte_code, i);
-                    i = decoded_params.nextIndex;
+                    let decoded_typeidx = Leb.decodeUInt32(byte_code, i);
+                    i = decoded_typeidx.nextIndex;
                     func_type_idxs.push(decoded_typeidx.value);
                 }
 
@@ -378,12 +386,12 @@ function build_module(byte_code) {
 
             case table_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get array of table descriptions
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
@@ -404,14 +412,14 @@ function build_module(byte_code) {
                     i++;
 
                     // get minimum, always has minimum
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let min_size = decode.value;
 
                     // if bit 0x1 is set in flags get maximum
                     let max_size = undefined;
                     if (flags == 1) {
-                        decode = Leb.decodeUint32(byte_code, i);
+                        decode = Leb.decodeUInt32(byte_code, i);
                         i = decode.nextIndex;
                         max_size = decode.value;
                     }
@@ -431,12 +439,12 @@ function build_module(byte_code) {
 
             case memory_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get vector of values
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
@@ -448,12 +456,12 @@ function build_module(byte_code) {
                   i++;
                     if (lim_type == limit_min_type || lim_type == limit_min_max_type) {
                       // get min
-                        decode = Leb.decodeUint32(byte_code, i);
+                        decode = Leb.decodeUInt32(byte_code, i);
                         i = decode.nextIndex;
                         min = decode.value;
                         if (lim_type == limit_min_max_type) {
                             // get max
-                            decode = Leb.decodeUint32(byte_code, i);
+                            decode = Leb.decodeUInt32(byte_code, i);
                             i = decode.nextIndex;
                             max = decode.value;
                         }
@@ -461,7 +469,7 @@ function build_module(byte_code) {
                         console.log("alignment issue when parsing");
                     return -1;
                     }
-                    mems.push(new MemoryInstance(new Limit(min, max)));
+                    memories.push(new MemoryInstance(new Limit(min, max)));
                 }
 
                 // sanity check
@@ -473,12 +481,12 @@ function build_module(byte_code) {
 
             case global_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get array of globals
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
@@ -512,12 +520,12 @@ function build_module(byte_code) {
 
             case export_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get array of exports
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
@@ -525,7 +533,7 @@ function build_module(byte_code) {
                 for (let j = 0; j < num_els; j++) {
                     // get name (identifier: byte array wich is valid UTF-8)
                     let name_byte_array = [];
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let len = decode.value;
 
@@ -542,12 +550,12 @@ function build_module(byte_code) {
                     i++;
 
                     // get index (address in list of kind)
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let index = decode.value;
 
                     // construct export
-                    exports.push(new ExportInstance(name, kind, index));
+                    module_exports.push(new ExportInstance(name, kind, index));
                 }
 
                 // sanity check
@@ -560,12 +568,12 @@ function build_module(byte_code) {
 
             case start_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get the index of the start function
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 start = decode.value;
 
@@ -579,19 +587,19 @@ function build_module(byte_code) {
 
             case element_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get array of table initializers
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
                 // get table initializer
                 for (let j = 0; j < num_els; j++) {
                     // get table index
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let table_index = decode.value;
 
@@ -602,7 +610,7 @@ function build_module(byte_code) {
                     i = ret.nextIndex;
 
                     // get elements (array of function indices)
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     len = decode.value;
 
@@ -614,7 +622,7 @@ function build_module(byte_code) {
 
                     for (let k = 0; k < len; k++) {
                         // get func index
-                        decode = Leb.decodeUint32(byte_code, i);
+                        decode = Leb.decodeUInt32(byte_code, i);
                         i = decode.nextIndex;
                         func_index = decode.value;
 
@@ -632,35 +640,35 @@ function build_module(byte_code) {
 
             case code_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get vector of functions
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
 
                 // get function
                 for (let j = 0; j < num_els; j++) {
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let func_size = decode.value;
 
                     // sanity check
                     if (byte_code[i + func_size - 1] != expression_end_code) {
-                        console.log("malformed function in code section.");
                       return -1;
                     }
                     let func_end = i + func_size;
 
                     // get locals
                     let locals = [];
-                     decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let num_locals = decode.value;
                     for (let k = 0; k < num_locals; k++) {
-                        decode = Leb.decodeUint32(byte_code, i);
+                        decode = Leb.decodeUInt32(byte_code, i);
                         i = decode.nextIndex;
                         let num_of_type = decode.value;
                         for (let p = 0; p < num_of_type; p++) {
@@ -687,29 +695,30 @@ function build_module(byte_code) {
 
             case data_section_id:
                 i++;
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 expected_end = i + decode.value;
 
                 // get vector of datas
-                decode = Leb.decodeUint32(byte_code, i);
+                decode = Leb.decodeUInt32(byte_code, i);
                 i = decode.nextIndex;
                 num_els = decode.value;
-
                 // get data element
                 for (let j = 0; j < num_els; j++) {
-                    decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let mem_idx = decode.value;
-
                     // get offset
                     let offset;
                     let ret = parse_init_expression(byte_code, i);
+                    if (ret == -1){
+                        return -1;
+                    }
                     offset = ret.value;
                     i = ret.nextIndex;
 
                      // get data
-                     decode = Leb.decodeUint32(byte_code, i);
+                    decode = Leb.decodeUInt32(byte_code, i);
                     i = decode.nextIndex;
                     let data_len = decode.value;
                     for (let k = 0; k < data_len; k++) {
@@ -731,10 +740,9 @@ function build_module(byte_code) {
         }
     }
 
-    let module = new ModuleInstance(types, funcAddrs, tableAddrs, memAddrs, globalAddrs, module_exports);
+    let module = new ModuleInstance(types, funcs, tables, memories, globals, module_exports);
     return module;
 }
-
 // mod is of type ModuleInstance
 // function_idx is an int
 // params is an array of Variables
