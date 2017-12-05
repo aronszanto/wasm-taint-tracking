@@ -2566,10 +2566,9 @@ function run_function(mod, function_idx, params) {
                     console.log("value of invalid type on top of stack");
                     return -1;
                 }
-                let k = c2 % 32;
+                let k = c2.value % 32;
                 let res = (c1.value << k) % Math.pow(2, 32);
                 mod.stack.push(new Variable(int32_type, res));
-            
                 break;
             case i32_shr_s_op_code:
                 if (mod.stack.len() <= 1) {
@@ -2582,8 +2581,8 @@ function run_function(mod, function_idx, params) {
                     console.log("value of invalid type on top of stack");
                     return -1;
                 }
-                
-                let res = c1.value >> c2.value;
+                let k = c2.value % 32;
+                let res = c1.value >> k;
                 mod.stack.push(new Variable(int32_type, res));
                 
                 break;
@@ -2598,8 +2597,9 @@ function run_function(mod, function_idx, params) {
                     console.log("value of invalid type on top of stack");
                     return -1;
                 }
-                
-                let res = c1.value >>> c2.value;
+
+                let k = c2.value % 32;
+                let res = c1.value >>> k;
                 mod.stack.push(new Variable(int32_type, res));    
                 break;
             case i32_rotl_op_code:
@@ -2614,7 +2614,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                let res = BitwiseRotation.rolInt32(c1, c2 % 32);
+                let res = BitwiseRotation.rolInt32(c1.value, c2.value % 32);
                 mod.stack.push(new Variable(int32_type, res));    
                 break;
             case i32_rotr_op_code:
@@ -2629,7 +2629,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                let res = BitwiseRotation.rorInt32(c1, c2 % 32);
+                let res = BitwiseRotation.rorInt32(c1.value, c2.value % 32);
                 mod.stack.push(new Variable(int32_type, res));    
                 break;
 
@@ -2645,7 +2645,7 @@ function run_function(mod, function_idx, params) {
                 }
                 // get number of leading zeros in c
                 let nb_lz = 64;
-                if (c.value.lt(0) {
+                if (c.value.lt(0)) {
                     nb_lz = 0;
                 }
                 else if (c.value.gt(0)) {
@@ -2654,57 +2654,228 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_lz));
                 break;
             case i64_ctz_op_code:
-                //TODO
+                if (mod.stack.len() <= 0) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c = mod.stack.pop();
+                if (c.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                // get number of trailing zeros in c
+                let nb_tz = 0;
+                if (c.value.ge(Bignum.pow(2,64))) {
+                    c.value.add(Bignum.pow(2,64));
+                }
+                while (c.value.ge(1)) {
+                    if (c.value.mod(2).eq(0)) {
+                        nb_tz += 1;
+                        c.value.div(2);
+                    }
+                    else {
+                        break;
+                    }
+                }
+                mod.stack.push(new Variable(int32_type, nb_tz));
                 break;
             case i64_popcnt_op_code:
-                //TODO
+                if (mod.stack.len() <= 0) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c = mod.stack.pop();
+                if (c.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let nb_nzb = 0;
+                // count the number of non zero bits in c
+                for (let i = 0; i < 64; i++) {
+                    if (c.value.mod(2).eq(1)) {
+                        nb_nzb++;
+                        c.value = c.value.sub(1).div(2);
+                    } 
+                }
+                mod.stack.push(new Variable(int32_type, nb_nzb));
                 break;
             case i64_add_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = (c1.value.add(c2.value)).mod(Bignum.pow(2, 64));
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_sub_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = (c1.value.sub(c2.value).add(Bignum.pow(2, 64))).mod(Bignum.pow(2, 64));
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_mul_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = (c1.value.mul(c2.value)).mod(Bignum.pow(2, 64));
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_div_s_op_code:
-                //TODO
-                break;
             case i64_div_u_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                if (c2.value.eq(0)) {
+                    mod.stack.push(new Variable(int64_type, Bignum(0)));
+                    break;
+                }
+                else {
+                    let res = c1.value.div(c2.value);
+                    mod.stack.push(new Variable(int64_type, res));
+                }
                 break;
             case i64_rem_s_op_code:
-                //TODO
-                break;
             case i64_rem_u_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                if (c2.value.eq(0)) {
+                    mod.stack.push(new Variable(int64_type, 0));
+                    break;
+                }
+                else {
+                    let res = c1.value.mod(c2.value);
+                    mod.stack.push(new Variable(int64_type, res));
+                }
                 break;
             case i64_and_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = c1.value.and(c2.value);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_or_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = c1.value.or(c2.value);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_xor_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = c1.value.xor(c2.value);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shl_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let k = c2.value.mod(64);
+                let res = c1.value.shiftLeft(k);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shr_s_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let k = c2.value.mod(64);
+                let res = c1.value.shiftRight(k);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shr_u_op_code:
-                //TODO
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                let c2 = mod.stack.pop();
+                if (c1.type != int64_type || c2.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let k = c2.value.mod(64).toNumber();                
+                let res = c1.value.div(Math.pow(2, k));
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_rotl_op_code:
-                //TODO
-                break;
+                console.log("64 bit rotations are not supported");
+                return -1;
             case i64_rotr_op_code:
-                //TODO
-                break;
-
+                console.log("64 bit rotations are not supported");
+                return -1;
             case f32_abs_op_code:
                 console.log("floating point operations are not supported");
                 return -1;
@@ -2792,7 +2963,17 @@ function run_function(mod, function_idx, params) {
                 return -1;
 
             case i32_wrap_i64_op_code:
-                //TODO
+                if (mod.stack.len() <= 0) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                if (c1.type != int64_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = c1.value.mod(Math.pow(2, 32)).toNumber();
+                mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_trunc_s_f32_op_code:
                 console.log("floating point operations are not supported");
@@ -2807,10 +2988,37 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i64_extend_s_i32_op_code:
-                //TODO
+                if (mod.stack.len() <= 0) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                if (c1.type != int32_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let res = Bignum(c1.value);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_extend_u_i32_op_code:
-                //TODO
+                if (mod.stack.len() <= 0) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+                let c1 = mod.stack.pop();
+                if (c1.type != int32_type) {
+                    console.log("value of invalid type on top of stack");
+                    return -1;
+                }
+                let opts = {              
+                    endian : 'little',
+                    size : 1
+                };
+                let b = Uint8Array(8);
+                let dataView = DataView(b);
+                dataView.setUint32(0, c1.value, true);
+                let res = Bignum.fromBuffer(b, opts);
+                mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_trunc_s_f32_op_code:
                 console.log("floating point operations are not supported");
