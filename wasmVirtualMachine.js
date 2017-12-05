@@ -3016,5 +3016,34 @@ function run_function(mod, function_idx, params) {
 
     console.log("Reached end of function code without a return");
     return -1;
+}
 
+
+class WASMInterpreter {
+    constructor(byte_code) {
+        this.module = build_module(byte_code); 
+    }
+
+    get_functions() {
+        names = [];
+        this.module.exports.forEach((exp) => {
+            names.push(exp.name);
+        });
+        return names;
+    }
+
+    run_function(name, params) {
+        this.module.exports.forEach((exp) => {
+            if (exp.name == name) {
+                // validate params
+                if (params.length != this.module.funcs[exp.index].type.params.length) {
+                    console.log("Invalid parameters");
+                    return -1;
+                }
+                return run_function(this.module, exp.index, params);
+            }
+        });
+        console.log("Invalid function name");
+        return -1;
+    }
 }
