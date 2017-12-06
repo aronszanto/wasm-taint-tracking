@@ -18,6 +18,7 @@
   "homepage": "https://github.com/thctamm/webAssemblyTaintTracking#readme",
   "dependencies": {
     "bignum": "^0.12.5",
+    "bitwise-rotation": "^1.0.1",
     "leb": "^0.3.0",
     "utf8-string-bytes": "^1.0.2"
   }
