@@ -16,7 +16,7 @@ class Stack {
     }
 
     len() {
-        return this.data.len();
+        return this.data.length;
     }
 }
 
