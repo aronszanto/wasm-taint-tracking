@@ -1,3 +1,6 @@
+const DEBUG = false;
+const DEBUG2 = false;
+
 const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
 const FunctionInstance = require('./FunctionInstance');
@@ -750,6 +753,12 @@ function build_module(byte_code) {
 // function_idx is an int
 // params is an array of Variables
 function run_function(mod, function_idx, params) {
+    if (DEBUG) {
+        console.log("EXECUTING: ");
+        for (let pp = 0; pp < mod.funcs[function_idx].code.length; pp++) {
+            console.log(pp + ": 0x" + mod.funcs[function_idx].code[pp].toString(16));
+        }
+    }
     let old_func = mod.funcs[function_idx];
 
     // Validate parameters
@@ -778,6 +787,8 @@ function run_function(mod, function_idx, params) {
     // push the function frame onto the stack
     mod.stack.push(new Variable(frame_type, 0));
 
+    let frame_ptr = mod.stack.ptr();
+
     // push the params onto the stack and locals
     params.forEach((el) => {
         mod.stack.push(el);
@@ -801,6 +812,8 @@ function run_function(mod, function_idx, params) {
     let align;
     let mem;
     let opt;
+    let opts;
+    let buf;
     let ea;
     let i;
     let c;
@@ -821,7 +834,11 @@ function run_function(mod, function_idx, params) {
     let new_var;
     while (code_ptr < func.code.length) {
         op_code = func.code[code_ptr];
-        console.log("evaluating opcode: " + op_code + " at :" + code_ptr)
+        if (DEBUG) {
+            mod.stack.print();
+            console.log("evaluating opcode: 0x" +op_code.toString(16) + " at: " + code_ptr)
+            console.log("\n");
+        }
         switch (op_code) {
 
             // control instruction op codes
@@ -836,7 +853,7 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 type = func.code[code_ptr];
                 code_ptr++;
-                labels.push(
+                labels.unshift(
                     {
                         block_type: block_op_code,
                         ret_type: type,
@@ -850,7 +867,7 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 type = func.code[code_ptr];
                 code_ptr++;
-                labels.push(
+                labels.unshift(
                     {
                         block_type: loop_op_code,
                         ret_type: type,
@@ -866,11 +883,12 @@ function run_function(mod, function_idx, params) {
                     console.log("invalid test type at the top of the stack");
                     return -1;
                 }
+                
+                type = func.code[code_ptr];
                 if (test_val.value != 0) {
                     // get block type
-                    type = func.code[code_ptr];
                     code_ptr++;
-                    labels.push(
+                    labels.unshift(
                         {
                             block_type: if_op_code,
                             ret_type: type,
@@ -880,15 +898,22 @@ function run_function(mod, function_idx, params) {
                     mod.stack.push(new Variable(label_type, 0));
                 } else {
                     // skip to either end or else
-                    while (func.code[code_ptr] != else_op_code || func.code[code_ptr] != expression_end_code) {
+                    let to_skip = 1;
+                    while (to_skip > 0) {
                         code_ptr++;
+                        if (func.code[code_ptr] == if_op_code || func.code[code_ptr] == block_op_code || func.code[code_ptr] == loop_op_code) {
+                            to_skip++;
+                        }
+                        else if (func.code[code_ptr] == expression_end_code) {
+                            to_skip--;
+                        }
+                        if (func.code[code_ptr] == else_op_code && to_skip == 1) {
+                            to_skip--;
+                        }
                     }
-
                     if (func.code[code_ptr] == else_op_code) {
                         // get block type
-                        type = func.code[code_ptr];
-                        code_ptr++;
-                        labels.push(
+                        labels.unshift(
                             {
                                 block_type: if_op_code,
                                 ret_type: type,
@@ -897,6 +922,7 @@ function run_function(mod, function_idx, params) {
                         );
                         mod.stack.push(new Variable(label_type, 0));
                     }
+                    code_ptr++;
                 }
                 break;
             case else_op_code:
@@ -906,7 +932,7 @@ function run_function(mod, function_idx, params) {
                 }
                 break;
             case expression_end_code:
-                // end of function
+                // if end of function
                 if (code_ptr == func.code.length -1) {
                     if (mod.stack.len() < func.type.returns.length + 1) {
                         console.log("not enough values on stack when returning");
@@ -944,7 +970,7 @@ function run_function(mod, function_idx, params) {
                         return -1;
                     }
                     ret_val = mod.stack.pop();
-                    if (ret_val.type != label[ret_type]) {
+                    if (ret_val.type != label.ret_type) {
                         console.log("invalid value on top of stack at the end of an expression");
                         return -1;
                     }
@@ -961,11 +987,7 @@ function run_function(mod, function_idx, params) {
                 if (ret_val != null) {
                     mod.stack.push(ret_val);
                 }
-                if (label[block_type] == loop_op_code) {
-                    code_ptr = label[start];
-                } else {
-                    code_ptr++;
-                }
+                code_ptr++;
 
                 break;
             case br_op_code:
@@ -1011,12 +1033,17 @@ function run_function(mod, function_idx, params) {
                     labels.pop();
                 }
 
+                if (label.block_type == loop_op_code) {
+                    code_ptr = label.start;
+                }
                 // go to the end of the block
-                while (popped > 0) {
-                    if (func.code[code_ptr] == expression_end_code) {
-                        popped--;
+                else {
+                    while (popped > 0) {
+                        if (func.code[code_ptr] == expression_end_code) {
+                            popped--;
+                        }
+                        code_ptr++;
                     }
-                    code_ptr++;
                 }
 
                 break;
@@ -1075,18 +1102,22 @@ function run_function(mod, function_idx, params) {
                     for (let lbl = 0; lbl <= idx; lbl++) {
                         labels.pop();
                     }
+                    console.log(label.block_type);
+                    console.log(loop_op_code);
 
-                    // go to the end of the block
-                    while (popped > 0) {
-                        if (func.code[code_ptr] == expression_end_code) {
-                            popped--;
-                        }
-                        code_ptr++;
+                    if (label.block_type == loop_op_code) {
+                        code_ptr = label.start;
                     }
-                    code_ptr++;
+                    // go to the end of the block
+                    else {
+                        while (popped > 0) {
+                            if (func.code[code_ptr] == expression_end_code) {
+                                popped--;
+                            }
+                            code_ptr++;
+                        }
+                    }
 
-                } else {
-                    code_ptr++;
                 }
                 break;
             case br_table_op_code:
@@ -1160,12 +1191,18 @@ function run_function(mod, function_idx, params) {
                     labels.pop();
                 }
 
+
+                if (label.block_type == loop_op_code) {
+                    code_ptr = label.start;
+                }
                 // go to the end of the block
-                while (popped > 0) {
-                    if (func.code[code_ptr] == expression_end_code) {
-                        popped--;
+                else {
+                    while (popped > 0) {
+                        if (func.code[code_ptr] == expression_end_code) {
+                            popped--;
+                        }
+                        code_ptr++;
                     }
-                    code_ptr++;
                 }
                 break;
             case return_op_code:
@@ -1311,8 +1348,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 let cond = mod.stack.pop();
-                let var1 = mod.stack.pop();
                 let var2 = mod.stack.pop();
+                let var1 = mod.stack.pop();
                 if (cond.type != int32_type) {
                     console.log("invalid condition variable in select operation");
                     return -1;
@@ -1322,9 +1359,9 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 if (cond.value == 0) {
-                    mod.stack.push(val2);
+                    mod.stack.push(var2);
                 } else {
-                    mod.stack.push(val1);
+                    mod.stack.push(var1);
                 }
                 code_ptr++;
                 break;
@@ -1340,7 +1377,7 @@ function run_function(mod, function_idx, params) {
                     console.log("Invalid local index. locals len is: " + func.locals.length + ". idx is: " + idx);
                     return -1;
                 }
-                mod.stack.push(func.locals[idx]);
+                mod.stack.push(mod.stack.get(idx + frame_ptr + 1));
                 break;
             case set_local_op_code:
                 code_ptr++;
@@ -1358,7 +1395,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                func.locals[idx] = mod.stack.pop();
+                mod.stack.set(idx + frame_ptr + 1, mod.stack.pop());
                 break;
             case tee_local_op_code:
                 code_ptr++;
@@ -1374,8 +1411,9 @@ function run_function(mod, function_idx, params) {
                     console.log("Empty stack in tee local");
                     return -1;
                 }
-                func.locals[idx] = mod.stack.pop();
-                mod.stack.push(func.local[idx]);
+                let popped_value = mod.stack.pop();
+                mod.stack.set(idx + frame_ptr + 1, popped_value);
+                mod.stack.push(popped_value);
                 break;
             case get_global_op_code:
                 code_ptr++;
@@ -1413,6 +1451,7 @@ function run_function(mod, function_idx, params) {
 
             // memory instruction op codes
             case i32_load_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1439,27 +1478,24 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 32;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
+                buf = mem.slice(ea, ea + N/8);
                 // read buffer with little endian storage
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint32(true);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint32(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int32_type, c);
+                new_var = new Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
 
             case i64_load_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1486,17 +1522,13 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 64;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
+                buf = mem.slice(ea, ea + N/8);
                 // read buffer with little endian storage
                 opt = {
                     endian : 'little',
@@ -1505,7 +1537,7 @@ function run_function(mod, function_idx, params) {
                 c = Bignum.fromBuffer(b, opt);
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, c);
+                new_var = new Variable(int64_type, c);
                 mod.stack.push(new_var);
                 break;
 
@@ -1516,6 +1548,7 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i32_load8_s_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1542,29 +1575,26 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint8(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint8(0);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
 
                 // push loaded value to the stack
-                new_var = Variable(int32_type, c);
+                new_var = new Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
 
             case i32_load8_u_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1591,26 +1621,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint8(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint8(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int32_type, c);
+                new_var = new Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
 
             case i32_load16_s_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1637,28 +1664,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint16(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint16(0);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
                 // push loaded value to the stack
-                new_var = Variable(int32_type, c);
+                new_var = new Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
 
             case i32_load16_u_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1685,26 +1709,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint16(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint16(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int32_type, c);
+                new_var = new Variable(int32_type, c);
                 mod.stack.push(new_var);
                 break;
 
             case i64_load8_s_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1731,30 +1752,27 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint8(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint8(0);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
 
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i64_load8_u_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1781,26 +1799,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint8(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint8(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i64_load16_s_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1827,29 +1842,26 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint16(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint16(0);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i64_load16_u_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1876,26 +1888,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint16(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint16(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i64_load32_s_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1922,29 +1931,26 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 32;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint32(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint32(0);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i64_load32_u_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -1971,26 +1977,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during load");
-                    return -1;
-                }
                 N = 32;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
                 // read memory
-                b = mem.slice(ea, ea + N/8);
-                dataView = new DataView(b.buffer);
-                c = dataView.getUint32(true);
+                buf = mem.slice(ea, ea + N/8);
+                dataView = new DataView(buf.buffer);
+                c = dataView.getUint32(0);
 
                 // push loaded value to the stack
-                new_var = Variable(int64_type, Bignum.bignum(c));
+                new_var = new Variable(int64_type, Bignum.bignum(c));
                 mod.stack.push(new_var);
                 break;
 
             case i32_store_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2023,26 +2026,23 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 32;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint32(0, c.value, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
             case i64_store_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2079,12 +2079,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 64;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
@@ -2093,11 +2089,11 @@ function run_function(mod, function_idx, params) {
                     endian : 'little',
                     size : 1
                 };
-                b = c.toBuffer(opt);
+                buf = c.toBuffer(opt);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
             case f32_store_op_code:
@@ -2107,6 +2103,7 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i32_store8_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2139,28 +2136,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 n = c.value % Math.pow(2, N);
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint8(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
 
             case i32_store16_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2193,28 +2187,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 n = c.value % Math.pow(2, N);
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint16(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
 
             case i64_store8_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2251,28 +2242,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 8;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 n = c.value.mod(Math.pow(2, N)).toNumber();
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint8(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
 
             case i64_store16_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2309,28 +2297,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 16;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 n = c.value.mod(Math.pow(2, N)).toNumber();
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint16(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
 
             case i64_store32_op_code:
+                code_ptr++;
                 // get memarg, start with offset
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
@@ -2367,28 +2352,25 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 ea = i.value + offset;
-                if (ea % Math.pow(2, align) != 0) {
-                    console.log("alignment issue during store");
-                    return -1;
-                }
                 N = 32;
-                if (ea + N/8 > mem.len()) {
+                if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
                 n = c.value.mod(Math.pow(2,N)).toNumber();
                 // write buffer
-                b = new Uint8Array(N/8);
-                dataView = new DataView(b.buffer);
+                buf = new Uint8Array(N/8);
+                dataView = new DataView(buf.buffer);
                 dataView.setUint32(0, n, true);
 
                 // store buffer to memory
                 for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = b[j];
+                    mem[ea + j] = dataView.buffer[j];
                 }
                 break;
 
             case current_memory_op_code:
+                code_ptr++;
                 // get memory instance
                 if (!mod.memories[0]) {
                     console.log("trying to read unset memory instace");
@@ -2396,21 +2378,22 @@ function run_function(mod, function_idx, params) {
                 }
                 mem = mod.memories[0].bytes;
 
-                sz = mem.len() / MemoryInstance.page_size;  // defined in memory instancce
+                sz = mem.length / MemoryInstance.page_size;  // defined in memory instancce
 
                 // push size to the stack
-                 new_var = Variable(int32_type, sz);
+                new_var = new Variable(int32_type, sz);
                 mod.stack.push(new_var);
                 break;
 
             case grow_memory_op_code:
+                code_ptr++;
                 // get memory instance
                 if (!mod.memories[0]) {
                     console.log("trying to read unset memory instace");
                     return -1;
                 }
                 mem = mod.memories[0].bytes;
-                sz = mem.len() / MemoryInstance.page_size;  // defined in memory instancce
+                sz = mem.length / MemoryInstance.page_size;  // defined in memory instancce
 
                 if (mod.stack.len() <= 0) {
                     console.log("Empty stack in grow mem op");
@@ -2428,7 +2411,7 @@ function run_function(mod, function_idx, params) {
                 // TODO check if the operation was successful above, for the moment we assume ok
 
                 // push size to the stack
-                new_var = Variable(int32_type, sz);
+                new_var = new Variable(int32_type, sz);
                 mod.stack.push(new_var);
 
                 break;
@@ -2478,8 +2461,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                val1 = mod.stack.pop();
                 val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
@@ -2499,8 +2482,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                val1 = mod.stack.pop();
                 val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type +". got:" + val1.type + ", " + val2.type);
                     return -1;
@@ -2514,7 +2497,43 @@ function run_function(mod, function_idx, params) {
 
                 code_ptr++;
                 break;
-            case i32_lt_s_op_code:
+            case i32_lt_s_op_code: 
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+
+                val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
+                if (val2.value >= Math.pow(2, 31)) {
+                    val2.value -= Math.pow(2, 31); 
+                }
+                if (val1.value >= Math.pow(2, 31)) {
+                    val1.value -= Math.pow(2, 31); 
+                }
+                if (val1.type != int32_type || val2.type != int32_type) {
+                    console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
+                    return -1;
+                }
+                
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " < " + val2.value);
+                }
+                if (val1.value < val2.value) {
+                    mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    }
+                } else {
+                    mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    }
+                }
+
+                code_ptr++;
+                break;
+
             case i32_lt_u_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
@@ -2528,15 +2547,61 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " < " + val2.value);
+                }
+
                 if (val1.value < val2.value) {
                     mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    }
                 } else {
                     mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    }
                 }
 
                 code_ptr++;
                 break;
             case i32_gt_s_op_code:
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+
+                val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
+                if (val2.value >= Math.pow(2, 31)) {
+                    val2.value -= Math.pow(2, 31); 
+                }
+                if (val1.value >= Math.pow(2, 31)) {
+                    val1.value -= Math.pow(2, 31); 
+                }
+                if (val1.type != int32_type || val2.type != int32_type) {
+                    console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
+                    return -1;
+                }
+
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " > " + val2.value);
+                }
+
+                if (val1.value > val2.value) {
+                    mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    }
+                } else {
+                    mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    }
+                }
+
+                code_ptr++;
+                break;
             case i32_gt_u_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
@@ -2550,15 +2615,62 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " > " + val2.value);
+                }
+
                 if (val1.value > val2.value) {
                     mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    }
                 } else {
                     mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    } 
                 }
 
                 code_ptr++;
                 break;
             case i32_le_s_op_code:
+               if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+
+                val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
+                if (val2.value >= Math.pow(2, 31)) {
+                    val2.value -= Math.pow(2, 31); 
+                }
+                if (val1.value >= Math.pow(2, 31)) {
+                    val1.value -= Math.pow(2, 31); 
+                }
+                if (val1.type != int32_type || val2.type != int32_type) {
+                    console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
+                    return -1;
+                }
+
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " <= " + val2.value);
+                }
+
+                if (val1.value <= val2.value) {
+                    mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    } 
+                } else {
+                    mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    } 
+                }
+
+                code_ptr++;
+                break;
+ 
             case i32_le_u_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
@@ -2572,15 +2684,62 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " <= " + val2.value);
+                }
+
                 if (val1.value <= val2.value) {
                     mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    } 
                 } else {
                     mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    } 
                 }
 
                 code_ptr++;
                 break;
             case i32_ge_s_op_code:
+                if (mod.stack.len() <= 1) {
+                    console.log("Stack does not contain enough elements");
+                    return -1;
+                }
+
+                val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
+                if (val2.value >= Math.pow(2, 31)) {
+                    val2.value -= Math.pow(2, 31); 
+                }
+                if (val1.value >= Math.pow(2, 31)) {
+                    val1.value -= Math.pow(2, 31); 
+                }
+                if (val1.type != int32_type || val2.type != int32_type) {
+                    console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
+                    return -1;
+                }
+
+               if (DEBUG2) {
+                console.log("checking if " + val1.value + " >= " + val2.value);
+            } 
+
+                if (val1.value >= val2.value) {
+                    mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    } 
+                } else {
+                    mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    } 
+                }
+
+                code_ptr++;
+                break;
+
             case i32_ge_u_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
@@ -2594,10 +2753,20 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
+                if (DEBUG2) {
+                    console.log("checking if " + val1.value + " >= " + val2.value);
+                }
+
                 if (val1.value >= val2.value) {
                     mod.stack.push(new Variable(int32_type, 1));
+                    if (DEBUG2) {
+                        console.log("answer: YES");
+                    } 
                 } else {
                     mod.stack.push(new Variable(int32_type, 0));
+                    if (DEBUG2) {
+                        console.log("answer: NO");
+                    } 
                 }
 
                 code_ptr++;
@@ -2633,8 +2802,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                val1 = mod.stack.pop();
                 val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
                 if (val1.type != int64_type || val2.type != int64_type) {
                     console.log("values of invalid types on top of stack. expected: " + int64_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
@@ -2658,8 +2827,8 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                val1 = mod.stack.pop();
                 val2 = mod.stack.pop();
+                val1 = mod.stack.pop();
                 if (val1.type != int64_type || val2.type != int64_type) {
                     console.log("values of invalid types on top of stack. expected: " + int64_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
@@ -2820,7 +2989,9 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
 
+                    code_ptr++;
             case i32_clz_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -2841,6 +3012,7 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_lz));
                 break;
             case i32_ctz_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -2867,6 +3039,7 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_tz));
                 break;
             case i32_popcnt_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -2887,12 +3060,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_nzb));
                 break;
             case i32_add_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -2901,28 +3075,32 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_sub_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
                 }
-                res = (c1.value - c2.value + Math.pow(2, 32)) % Math.pow(2, 32);
+                //res = (c1.value - c2.value + Math.pow(2, 32)) % Math.pow(2, 32);
+                res = (c1.value - c2.value);
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_mul_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
+                    console.log("    got: " + c1.type +" , " + c2.type + ". expected: " + int32_type);
                     return -1;
                 }
                 res = (c1.value * c2.value) % Math.pow(2, 32);
@@ -2930,12 +3108,13 @@ function run_function(mod, function_idx, params) {
                 break;
             case i32_div_s_op_code:
             case i32_div_u_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -2951,12 +3130,13 @@ function run_function(mod, function_idx, params) {
                 break;
             case i32_rem_s_op_code:
             case i32_rem_u_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -2971,12 +3151,13 @@ function run_function(mod, function_idx, params) {
                 }
                 break;
             case i32_and_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -2985,12 +3166,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_or_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3000,12 +3182,13 @@ function run_function(mod, function_idx, params) {
 
                 break;
             case i32_xor_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3015,12 +3198,13 @@ function run_function(mod, function_idx, params) {
 
                 break;
             case i32_shl_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3030,12 +3214,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_shr_s_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3046,12 +3231,13 @@ function run_function(mod, function_idx, params) {
 
                 break;
             case i32_shr_u_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3062,12 +3248,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_rotl_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3077,12 +3264,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, res));
                 break;
             case i32_rotr_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int32_type || c2.type != int32_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3093,6 +3281,7 @@ function run_function(mod, function_idx, params) {
                 break;
 
             case i64_clz_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3113,6 +3302,7 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_lz));
                 break;
             case i64_ctz_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3139,6 +3329,7 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_tz));
                 break;
             case i64_popcnt_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3159,12 +3350,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int32_type, nb_nzb));
                 break;
             case i64_add_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3173,12 +3365,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_sub_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3187,11 +3380,12 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_mul_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
+                c2 = mod.stack.pop();
                 c2 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
@@ -3202,12 +3396,13 @@ function run_function(mod, function_idx, params) {
                 break;
             case i64_div_s_op_code:
             case i64_div_u_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3223,12 +3418,13 @@ function run_function(mod, function_idx, params) {
                 break;
             case i64_rem_s_op_code:
             case i64_rem_u_op_code:
+                    code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3243,12 +3439,13 @@ function run_function(mod, function_idx, params) {
                 }
                 break;
             case i64_and_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3257,12 +3454,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_or_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3271,12 +3469,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_xor_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3285,12 +3484,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shl_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3300,12 +3500,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shr_s_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3315,12 +3516,13 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_shr_u_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
                 }
-                c1 = mod.stack.pop();
                 c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -3422,6 +3624,7 @@ function run_function(mod, function_idx, params) {
                 return -1;
 
             case i32_wrap_i64_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3447,6 +3650,7 @@ function run_function(mod, function_idx, params) {
                 console.log("floating point operations are not supported");
                 return -1;
             case i64_extend_s_i32_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3460,6 +3664,7 @@ function run_function(mod, function_idx, params) {
                 mod.stack.push(new Variable(int64_type, res));
                 break;
             case i64_extend_u_i32_op_code:
+                code_ptr++;
                 if (mod.stack.len() <= 0) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -3469,12 +3674,12 @@ function run_function(mod, function_idx, params) {
                     console.log("value of invalid type on top of stack");
                     return -1;
                 }
-                let opts = {
+                opts = {
                     endian : 'little',
                     size : 1
                 };
-                let b = Uint8Array(8);
-                let dataView = DataView(b);
+                buf = Uint8Array(8);
+                dataView = DataView(b);
                 dataView.setUint32(0, c1.value, true);
                 res = Bignum.fromBuffer(b, opts);
                 mod.stack.push(new Variable(int64_type, res));
