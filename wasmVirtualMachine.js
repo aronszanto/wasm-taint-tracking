@@ -1,5 +1,4 @@
-const DEBUG = false;
-const DEBUG2 = false;
+const DEBUG = true;
 
 const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
@@ -749,6 +748,7 @@ function build_module(byte_code) {
     let module = new ModuleInstance(funcs, tables, memories, globals, module_exports);
     return module;
 }
+
 // mod is of type ModuleInstance
 // function_idx is an int
 // params is an array of Variables
@@ -883,7 +883,7 @@ function run_function(mod, function_idx, params) {
                     console.log("invalid test type at the top of the stack");
                     return -1;
                 }
-                
+
                 type = func.code[code_ptr];
                 if (test_val.value != 0) {
                     // get block type
@@ -1102,8 +1102,6 @@ function run_function(mod, function_idx, params) {
                     for (let lbl = 0; lbl <= idx; lbl++) {
                         labels.pop();
                     }
-                    console.log(label.block_type);
-                    console.log(loop_op_code);
 
                     if (label.block_type == loop_op_code) {
                         code_ptr = label.start;
@@ -1359,8 +1357,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 if (cond.value == 0) {
+                    var2.transfer_indirect_taint(cond);
                     mod.stack.push(var2);
                 } else {
+                    var1.transfer_indirect_taint(cond);
                     mod.stack.push(var1);
                 }
                 code_ptr++;
@@ -1425,7 +1425,7 @@ function run_function(mod, function_idx, params) {
                     console.log("Invalid global index. locals len is: " + mod.globals.length + ". idx is: " + idx);
                     return -1;
                 }
-                new_var = new Variable(mod.globals[idx].type, mod.globals[idx].value);
+                new_var = new Variable(mod.globals[idx].type, mod.globals[idx].value, mod.globals[idx].taint);
                 mod.stack.push(new_var);
                 break;
             case set_global_op_code:
@@ -1446,7 +1446,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to set unmutable global");
                     return -1;
                 }
-                mod.globals[idx].value = mod.stack.pop().value;
+                popped_val = mod.stack.pop()
+                mod.globals[idx].value = popped_val.value;
+                mod.globals[idx].taint = popped_val.taint;
                 break;
 
             // memory instruction op codes
@@ -2448,9 +2450,13 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (top_val.value == 0) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(top_val);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(top_val);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2469,9 +2475,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value == val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2490,14 +2502,20 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value != val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
                 break;
-            case i32_lt_s_op_code: 
+            case i32_lt_s_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
                     return -1;
@@ -2506,29 +2524,26 @@ function run_function(mod, function_idx, params) {
                 val2 = mod.stack.pop();
                 val1 = mod.stack.pop();
                 if (val2.value >= Math.pow(2, 31)) {
-                    val2.value -= Math.pow(2, 31); 
+                    val2.value -= Math.pow(2, 31);
                 }
                 if (val1.value >= Math.pow(2, 31)) {
-                    val1.value -= Math.pow(2, 31); 
+                    val1.value -= Math.pow(2, 31);
                 }
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
                 }
-                
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " < " + val2.value);
-                }
+
                 if (val1.value < val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    }
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    }
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2547,20 +2562,17 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " < " + val2.value);
-                }
 
                 if (val1.value < val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    }
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    }
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2574,30 +2586,27 @@ function run_function(mod, function_idx, params) {
                 val2 = mod.stack.pop();
                 val1 = mod.stack.pop();
                 if (val2.value >= Math.pow(2, 31)) {
-                    val2.value -= Math.pow(2, 31); 
+                    val2.value -= Math.pow(2, 31);
                 }
                 if (val1.value >= Math.pow(2, 31)) {
-                    val1.value -= Math.pow(2, 31); 
+                    val1.value -= Math.pow(2, 31);
                 }
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " > " + val2.value);
-                }
 
                 if (val1.value > val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    }
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    }
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2615,20 +2624,17 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " > " + val2.value);
-                }
 
                 if (val1.value > val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    }
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    } 
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2642,35 +2648,32 @@ function run_function(mod, function_idx, params) {
                 val2 = mod.stack.pop();
                 val1 = mod.stack.pop();
                 if (val2.value >= Math.pow(2, 31)) {
-                    val2.value -= Math.pow(2, 31); 
+                    val2.value -= Math.pow(2, 31);
                 }
                 if (val1.value >= Math.pow(2, 31)) {
-                    val1.value -= Math.pow(2, 31); 
+                    val1.value -= Math.pow(2, 31);
                 }
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " <= " + val2.value);
-                }
 
                 if (val1.value <= val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    } 
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    } 
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
                 break;
- 
+
             case i32_le_u_op_code:
                 if (mod.stack.len() <= 1) {
                     console.log("Stack does not contain enough elements");
@@ -2684,20 +2687,17 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " <= " + val2.value);
-                }
 
                 if (val1.value <= val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    } 
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    } 
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2711,30 +2711,26 @@ function run_function(mod, function_idx, params) {
                 val2 = mod.stack.pop();
                 val1 = mod.stack.pop();
                 if (val2.value >= Math.pow(2, 31)) {
-                    val2.value -= Math.pow(2, 31); 
+                    val2.value -= Math.pow(2, 31);
                 }
                 if (val1.value >= Math.pow(2, 31)) {
-                    val1.value -= Math.pow(2, 31); 
+                    val1.value -= Math.pow(2, 31);
                 }
                 if (val1.type != int32_type || val2.type != int32_type) {
                     console.log("values of invalid types on top of stack. expected: " + int32_type + ". got:" + val1.type + ", " + val2.type);
                     return -1;
                 }
 
-               if (DEBUG2) {
-                console.log("checking if " + val1.value + " >= " + val2.value);
-            } 
-
                 if (val1.value >= val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    } 
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    } 
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2753,20 +2749,17 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (DEBUG2) {
-                    console.log("checking if " + val1.value + " >= " + val2.value);
-                }
 
                 if (val1.value >= val2.value) {
-                    mod.stack.push(new Variable(int32_type, 1));
-                    if (DEBUG2) {
-                        console.log("answer: YES");
-                    } 
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
-                    if (DEBUG2) {
-                        console.log("answer: NO");
-                    } 
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2789,9 +2782,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (top_val.value.eq(0)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2814,9 +2813,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value.eq(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2839,9 +2844,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (!val1.value.eq(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2865,9 +2876,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value.lt(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2891,9 +2908,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value.gt(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2917,9 +2940,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value.le(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -2943,9 +2972,15 @@ function run_function(mod, function_idx, params) {
                 }
 
                 if (val1.value.ge(val2.value)) {
-                    mod.stack.push(new Variable(int32_type, 1));
+                    new_var = new Variable(int32_type, 1);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 } else {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0);
+                    new_var.transfer_indirect_taint(val1);
+                    new_var.transfer_indirect_taint(val2);
+                    mod.stack.push(new_var);
                 }
 
                 code_ptr++;
@@ -3009,7 +3044,9 @@ function run_function(mod, function_idx, params) {
                 else if (c.value > 0) {
                     nb_lz -= Math.floor(Math.log2(c.value))
                 }
-                mod.stack.push(new Variable(int32_type, nb_lz));
+                new_var = new Variable(int32_type, nb_lz)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i32_ctz_op_code:
                 code_ptr++;
@@ -3036,7 +3073,9 @@ function run_function(mod, function_idx, params) {
                         break;
                     }
                 }
-                mod.stack.push(new Variable(int32_type, nb_tz));
+                new_var = new Variable(int32_type, nb_tz)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i32_popcnt_op_code:
                 code_ptr++;
@@ -3057,7 +3096,9 @@ function run_function(mod, function_idx, params) {
                         c.value = (c.value - 1) / 2;
                     }
                 }
-                mod.stack.push(new Variable(int32_type, nb_nzb));
+                new_var = new Variable(int32_type, nb_nzb)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i32_add_op_code:
                 code_ptr++;
@@ -3072,7 +3113,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = (c1.value + c2.value) % Math.pow(2, 32);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_sub_op_code:
                 code_ptr++;
@@ -3088,7 +3132,10 @@ function run_function(mod, function_idx, params) {
                 }
                 //res = (c1.value - c2.value + Math.pow(2, 32)) % Math.pow(2, 32);
                 res = (c1.value - c2.value);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_mul_op_code:
                 code_ptr++;
@@ -3104,7 +3151,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = (c1.value * c2.value) % Math.pow(2, 32);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_div_s_op_code:
             case i32_div_u_op_code:
@@ -3120,12 +3170,18 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 if (c2.value == 0) {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                     break;
                 }
                 else {
                     res = Math.trunc((c1.value / c2.value));
-                    mod.stack.push(new Variable(int32_type, res));
+                    new_var = new Variable(int32_type, res)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                 }
                 break;
             case i32_rem_s_op_code:
@@ -3142,12 +3198,18 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 if (c2.value == 0) {
-                    mod.stack.push(new Variable(int32_type, 0));
+                    new_var = new Variable(int32_type, 0)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                     break;
                 }
                 else {
                     res = c1.value % c2.value;
-                    mod.stack.push(new Variable(int32_type, res));
+                    new_var = new Variable(int32_type, res)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                 }
                 break;
             case i32_and_op_code:
@@ -3163,7 +3225,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value & c2.value;
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_or_op_code:
                 code_ptr++;
@@ -3178,8 +3243,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value | c2.value;
-                mod.stack.push(new Variable(int32_type, res));
-
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_xor_op_code:
                 code_ptr++;
@@ -3194,8 +3261,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value ^ c2.value;
-                mod.stack.push(new Variable(int32_type, res));
-
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_shl_op_code:
                 code_ptr++;
@@ -3211,7 +3280,10 @@ function run_function(mod, function_idx, params) {
                 }
                 k = c2.value % 32;
                 res = (c1.value << k) % Math.pow(2, 32);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_shr_s_op_code:
                 code_ptr++;
@@ -3227,8 +3299,10 @@ function run_function(mod, function_idx, params) {
                 }
                 k = c2.value % 32;
                 res = c1.value >> k;
-                mod.stack.push(new Variable(int32_type, res));
-
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_shr_u_op_code:
                 code_ptr++;
@@ -3245,7 +3319,10 @@ function run_function(mod, function_idx, params) {
 
                 k = c2.value % 32;
                 res = c1.value >>> k;
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_rotl_op_code:
                 code_ptr++;
@@ -3261,7 +3338,10 @@ function run_function(mod, function_idx, params) {
                 }
 
                 res = BitwiseRotation.rolInt32(c1.value, c2.value % 32);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i32_rotr_op_code:
                 code_ptr++;
@@ -3277,7 +3357,10 @@ function run_function(mod, function_idx, params) {
                 }
 
                 res = BitwiseRotation.rorInt32(c1.value, c2.value % 32);
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int32_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
 
             case i64_clz_op_code:
@@ -3299,7 +3382,9 @@ function run_function(mod, function_idx, params) {
                 else if (c.value.gt(0)) {
                     nb_lz -= Math.floor(Math.log2(c.value))
                 }
-                mod.stack.push(new Variable(int32_type, nb_lz));
+                new_var = new Variable(int32_type, nb_lz)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i64_ctz_op_code:
                 code_ptr++;
@@ -3326,7 +3411,9 @@ function run_function(mod, function_idx, params) {
                         break;
                     }
                 }
-                mod.stack.push(new Variable(int32_type, nb_tz));
+                new_var = new Variable(int32_type, nb_tz)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i64_popcnt_op_code:
                 code_ptr++;
@@ -3347,7 +3434,9 @@ function run_function(mod, function_idx, params) {
                         c.value = c.value.sub(1).div(2);
                     }
                 }
-                mod.stack.push(new Variable(int32_type, nb_nzb));
+                new_var = new Variable(int32_type, nb_nzb)
+                new_var.transfer_direct_taint(c);
+                mod.stack.push(new_var);
                 break;
             case i64_add_op_code:
                 code_ptr++;
@@ -3362,7 +3451,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = (c1.value.add(c2.value)).mod(Bignum.pow(2, 64));
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_sub_op_code:
                 code_ptr++;
@@ -3377,7 +3469,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = (c1.value.sub(c2.value).add(Bignum.pow(2, 64))).mod(Bignum.pow(2, 64));
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_mul_op_code:
                 code_ptr++;
@@ -3392,7 +3487,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = (c1.value.mul(c2.value)).mod(Bignum.pow(2, 64));
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_div_s_op_code:
             case i64_div_u_op_code:
@@ -3409,11 +3507,18 @@ function run_function(mod, function_idx, params) {
                 }
                 if (c2.value.eq(0)) {
                     mod.stack.push(new Variable(int64_type, Bignum(0)));
+                    new_var = new Variable(int64_type, Bignum(0))
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                     break;
                 }
                 else {
                     res = c1.value.div(c2.value);
-                    mod.stack.push(new Variable(int64_type, res));
+                    new_var = new Variable(int64_type, res)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                 }
                 break;
             case i64_rem_s_op_code:
@@ -3430,12 +3535,18 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 if (c2.value.eq(0)) {
-                    mod.stack.push(new Variable(int64_type, 0));
+                    new_var = new Variable(int64_type, Bignum(0))
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                     break;
                 }
                 else {
                     res = c1.value.mod(c2.value);
-                    mod.stack.push(new Variable(int64_type, res));
+                    new_var = new Variable(int64_type, res)
+                    new_var.transfer_direct_taint(c1);
+                    new_var.transfer_direct_taint(c2);
+                    mod.stack.push(new_var);
                 }
                 break;
             case i64_and_op_code:
@@ -3451,7 +3562,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value.and(c2.value);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_or_op_code:
                 code_ptr++;
@@ -3466,7 +3580,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value.or(c2.value);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_xor_op_code:
                 code_ptr++;
@@ -3481,7 +3598,10 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value.xor(c2.value);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_shl_op_code:
                 code_ptr++;
@@ -3497,7 +3617,10 @@ function run_function(mod, function_idx, params) {
                 }
                 k = c2.value.mod(64);
                 res = c1.value.shiftLeft(k);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_shr_s_op_code:
                 code_ptr++;
@@ -3513,7 +3636,10 @@ function run_function(mod, function_idx, params) {
                 }
                 k = c2.value.mod(64);
                 res = c1.value.shiftRight(k);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_shr_u_op_code:
                 code_ptr++;
@@ -3529,7 +3655,10 @@ function run_function(mod, function_idx, params) {
                 }
                 k = c2.value.mod(64).toNumber();
                 res = c1.value.div(Math.pow(2, k));
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                new_var.transfer_direct_taint(c2);
+                mod.stack.push(new_var);
                 break;
             case i64_rotl_op_code:
                 console.log("64 bit rotations are not supported");
@@ -3635,7 +3764,9 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value.mod(Math.pow(2, 32)).toNumber();
-                mod.stack.push(new Variable(int32_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                mod.stack.push(new_var);
                 break;
             case i32_trunc_s_f32_op_code:
                 console.log("floating point operations are not supported");
@@ -3661,7 +3792,9 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = Bignum(c1.value);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                mod.stack.push(new_var);
                 break;
             case i64_extend_u_i32_op_code:
                 code_ptr++;
@@ -3682,7 +3815,9 @@ function run_function(mod, function_idx, params) {
                 dataView = DataView(b);
                 dataView.setUint32(0, c1.value, true);
                 res = Bignum.fromBuffer(b, opts);
-                mod.stack.push(new Variable(int64_type, res));
+                new_var = new Variable(int64_type, res)
+                new_var.transfer_direct_taint(c1);
+                mod.stack.push(new_var);
                 break;
             case i64_trunc_s_f32_op_code:
                 console.log("floating point operations are not supported");
@@ -3771,7 +3906,9 @@ class WASMInterpreter {
                 let var_params = [];
                 let i = 0;
                 this.module.funcs[exp.index].type.params.forEach((prm) => {
-                    var_params.push(new Variable(prm, params[i]));
+                    let taint = {};
+                    taint[i] = 3;
+                    var_params.push(new Variable(prm, params[i], taint));
                     i++;
                 });
                 return run_function(this.module, exp.index, var_params);
