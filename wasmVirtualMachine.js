@@ -1247,7 +1247,7 @@ function run_function(mod, function_idx, params) {
 
                     return rets;
                 }
-                label = labels.pop();
+                label = labels.shift();
                 ret_val = null;
                 if (label.ret_type != empty_result_type) {
                     if (mod.stack.len() <= 0) {
@@ -1522,7 +1522,7 @@ function run_function(mod, function_idx, params) {
 
                 call_params = [];
                 for (popped = 0; popped < mod.funcs[idx].type.params.length; popped++) {
-                    call_params.push(mod.stack.pop());
+                    call_params.unshift(mod.stack.pop());
                     if (call_params[0].type != mod.funcs[idx].type.params[popped]) {
                         console.log("invalid value popped from the stack during a function call");
                         return -1;
@@ -1588,7 +1588,7 @@ function run_function(mod, function_idx, params) {
 
                 call_params = [];
                 for (popped = 0; popped < mod.funcs[idx].type.params.length; popped++) {
-                    call_params.push(mod.stack.pop());
+                    call_params.unshift(mod.stack.pop());
                     if (call_params[0].type != mod.funcs[idx].type.params[popped]) {
                         console.log("invalid value popped from the stack during a function call");
                         return -1;

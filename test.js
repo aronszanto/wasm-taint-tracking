@@ -126,7 +126,32 @@ const tests = [
         expected_taint: {
             '0': 3
         }
+    },
+    {
+        name: 'test10',
+        params: [10],
+        expected_output: 4,
+        expected_taint: {
+            '0': 2
+        }
+    },
+    {
+        name: 'test11',
+        params: [11],
+        expected_output: 10,
+        expected_taint: {
+            '0': 3
+        }
+    },
+    {
+        name: 'test11',
+        params: [6299],
+        expected_output: 6298,
+        expected_taint: {
+            '0': 3
+        }
     }
+
 ];
 
 let byte_code;
@@ -137,7 +162,7 @@ let VM = new WAVM(byte_code);
 console.log("Running tests compiled with opimization\n");
 
 for (let test_num = 0; test_num < tests.length; test_num++) {
-//for (let test_num = tests.length-4; test_num < tests.length-3; test_num++) {
+//for (let test_num = tests.length-1; test_num < tests.length; test_num++) {
 //for (let test_num = 7; test_num < 8; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);

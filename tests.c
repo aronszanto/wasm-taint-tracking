@@ -67,7 +67,7 @@ int test5(int a, int b) {
 }
 
 // x should be directly tainted by a
-int test6(long long a) {
+short test6(long long a) {
   short x = (short) a;
   return x;
 }
@@ -91,4 +91,46 @@ long long test9(long long a) {
     x *= a;
   }
   return x;
+}
+
+int gcd(int a, int b)
+{
+    if (a == 0)
+        return b;
+    return gcd(b%a, a);
+}
+ 
+// A simple method to evaluate Euler Totient Function
+int test10(unsigned int n)
+{
+    unsigned int result = 1;
+    for (int i=2; i < n; i++)
+        if (gcd(i, n) == 1)
+            result++;
+    return result;
+}
+
+int test11(int n)
+{    
+    int result = n;   // Initialize result as n
+ 
+    // Consider all prime factors of n and subtract their
+    // multiples from result
+    for (int p=2; p*p<=n; ++p)
+    {
+        // Check if p is a prime factor.
+        if (n % p == 0)
+        {
+            // If yes, then update n and result 
+            while (n % p == 0)
+                n /= p;
+            result -= result / p;
+        }
+    }
+ 
+    // If n has a prime factor greater than sqrt(n)
+    // (There can be at-most one such prime factor)
+    if (n > 1)
+        result -= result / n;
+    return result;
 }
