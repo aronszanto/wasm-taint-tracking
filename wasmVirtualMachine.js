@@ -1751,6 +1751,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -1801,6 +1807,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -1856,6 +1868,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -1902,6 +1920,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -1950,6 +1974,12 @@ function run_function(mod, function_idx, params) {
                 }
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -1996,6 +2026,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2046,6 +2082,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2092,6 +2134,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2141,6 +2189,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2187,6 +2241,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2236,6 +2296,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2282,6 +2348,12 @@ function run_function(mod, function_idx, params) {
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
+                // transfer taint from memory to the new variable and from the index
+                new_var.transfer_indirect_taint(i);
+                for (let j = 0; j < N/8; j++) {
+                    let taint = mod.memories[0].getTaint(ea + j);
+                    new_var.transfer_from_taint(taint);
+                }
                 mod.stack.push(new_var);
                 break;
 
@@ -2333,6 +2405,12 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint32(0, c.value, true);
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
             case i64_store_op_code:
                 code_ptr++;
@@ -2386,9 +2464,14 @@ function run_function(mod, function_idx, params) {
                     size : 1
                 };
                 buf = c.toBuffer(opt);
-
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
             case f32_store_op_code:
                 console.log("floating point operations are not supported");
@@ -2446,6 +2529,12 @@ function run_function(mod, function_idx, params) {
 
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
 
             case i32_store16_op_code:
@@ -2498,6 +2587,12 @@ function run_function(mod, function_idx, params) {
 
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
 
             case i64_store8_op_code:
@@ -2554,6 +2649,12 @@ function run_function(mod, function_idx, params) {
 
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
 
             case i64_store16_op_code:
@@ -2610,6 +2711,12 @@ function run_function(mod, function_idx, params) {
 
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
 
             case i64_store32_op_code:
@@ -2666,6 +2773,12 @@ function run_function(mod, function_idx, params) {
 
                 // store buffer to memory
                 mem.set(buf, ea);
+                // propagate taint to the memory dict for the right index
+                for (let j = 0; j < N/8; j++) {
+                    mod.memories[0].taintInit(ea + j);
+                    mod.memories[0].receive_taint_variable(c, ea + j);
+                    mod.memories[0].receive_indirect_taint_variable(i, ea + j);
+                }
                 break;
 
             case current_memory_op_code:
