@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 const BLOCK_TAINT = true;
 
 const ModuleInstance = require('./ModuleInstance');
@@ -477,7 +477,7 @@ function add_label_taint(old_taint, variable) {
     let keys = Object.keys(variable.taint);
     let new_taint = {};
     for (let i = 0; i < keys.length; i++) {
-        if (variable.taint[keys[i]] & 2 > 0) {
+        if (variable.taint[keys[i]] & 2) {
             new_taint[keys[i]] |= 2;
         }
     }
@@ -1088,6 +1088,7 @@ function run_function(mod, function_idx, params) {
     let ret_type;
     let new_var;
     let next_taint = {};
+    let new_taint;
     while (code_ptr < func.code.length) {
         op_code = func.code[code_ptr];
         if (DEBUG) {
@@ -1097,7 +1098,7 @@ function run_function(mod, function_idx, params) {
             mod.memories[0].print();
             console.log("\nLABLES:");
             for (let as = 0; as < labels.length; as++) {
-                console.log("lbl " + as + ": type: " + labels[as].block_type);
+                console.log("lbl " + as + ": type: " + labels[as].block_type +" taint: " + JSON.stringify(labels[as].taint));
             }
             console.log("");
             console.log("evaluating opcode: 0x" +op_code.toString(16) + " at: " + code_ptr)
@@ -1117,12 +1118,17 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 type = func.code[code_ptr];
                 code_ptr++;
+                if (labels.length > 0) {
+                    new_taint = add_label_taint({}, labels[0]);
+                } else {
+                    new_taint = {};
+                }
                 labels.unshift(
                     {
                         block_type: block_op_code,
                         ret_type: type,
                         start: code_ptr-2,
-                        taint: {}
+                        taint: new_taint
                     }
                 );
                 mod.stack.push(new Variable(label_type, 0));
@@ -1132,12 +1138,17 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 type = func.code[code_ptr];
                 code_ptr++;
+                if (labels.length > 0) {
+                    new_taint = add_label_taint({}, labels[0]);
+                } else {
+                    new_taint = {};
+                }
                 labels.unshift(
                     {
                         block_type: loop_op_code,
                         ret_type: type,
                         start: code_ptr-2,
-                        taint: next_taint
+                        taint: add_label_taint(new_taint, {taint: next_taint})
                     }
                 );
                 next_taint = {};
@@ -1152,6 +1163,11 @@ function run_function(mod, function_idx, params) {
                 }
 
                 type = func.code[code_ptr];
+                if (labels.length > 0) {
+                    new_taint = add_label_taint({}, labels[0]);
+                } else {
+                    new_taint = {};
+                }
                 if (test_val.value != 0) {
                     // get block type
                     code_ptr++;
@@ -1160,7 +1176,7 @@ function run_function(mod, function_idx, params) {
                             block_type: if_op_code,
                             ret_type: type,
                             start: code_ptr-2,
-                            taint: add_label_taint({}, test_val)
+                            taint: add_label_taint(new_taint, test_val)
                         }
                     );
                     mod.stack.push(new Variable(label_type, 0));
@@ -1186,7 +1202,7 @@ function run_function(mod, function_idx, params) {
                                 block_type: if_op_code,
                                 ret_type: type,
                                 start: code_ptr-2,
-                                taint: add_label_taint({}, test_val)
+                                taint: add_label_taint(new_taint, test_val)
                             }
                         );
                         mod.stack.push(new Variable(label_type, 0));
@@ -2839,13 +2855,21 @@ function run_function(mod, function_idx, params) {
                 code_ptr++;
                 decode = Leb.decodeInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
-                mod.stack.push(new Variable(int32_type, decode.value));
+                new_var = new Variable(int32_type, decode.value);
+                if (labels.length > 0) {
+                    new_var.transfer_indirect_taint(labels[0]);
+                }
+                mod.stack.push(new_var);
                 break;
             case const_i64_op_code:
                 code_ptr++;
                 decode = Leb.decodeInt64(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
-                mod.stack.push(new Variable(int64_type, decode.value));
+                new_var = new Variable(int64_type, Bignum(decode.value));
+                if (labels.length > 0) {
+                    new_var.transfer_indirect_taint(labels[0]);
+                }
+                mod.stack.push(new_var);
                 break;
             case const_f32_op_code:
                 console.log("floating point operations are not supported");
