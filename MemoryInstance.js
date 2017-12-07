@@ -12,8 +12,8 @@ class MemoryInstance {
     print() {
         console.log("MEMORY: ");
         let string = "";
-        for(let i = 0; i < 20; i++) {
-            string += " " + i + "-" + this.bytes[i].toString();
+        for(let i = this.bytes.length-1; i > this.bytes.length-20; i--) {
+            string += " " + i + "-" + this.bytes[i];
         };
         console.log(string);
     }
