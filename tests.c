@@ -54,8 +54,8 @@ int test5(int a, int b) {
     nodes[i].val = a;
     nodes[i].next = &nodes[i+1];
   }
-  nodes[9].val = a;
-  nodes[0].next = 0;
+  nodes[b].val = a;
+  nodes[b].next = 0;
   int x = 0;
   struct node *head = &nodes[0];
   while (head != 0) {

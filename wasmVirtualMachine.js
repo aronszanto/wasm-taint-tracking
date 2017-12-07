@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 const BLOCK_TAINT = true;
 
 const ModuleInstance = require('./ModuleInstance');

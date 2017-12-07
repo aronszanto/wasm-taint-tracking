@@ -61,7 +61,7 @@ class MemoryInstance {
         let str = undefined;
         let bytes = ['0', '0', '0', '0'];
         let str_rep;
-        for(let i = 1; i < 33; i++) {
+        for(let i = 1; i < 65; i++) {
             if (i % 4 == 1) {
                 if (str != undefined) {
                     console.log(str + '0x' + bytes[0] + bytes[1] + bytes[2] + bytes[3]);
