@@ -64,7 +64,13 @@ class MemoryInstance {
         for(let i = 1; i < 65; i++) {
             if (i % 4 == 1) {
                 if (str != undefined) {
-                    console.log(str + '0x' + bytes[0] + bytes[1] + bytes[2] + bytes[3]);
+                    if (this.taintDict[this.bytes.length - i + 1]) {
+                        let taint = this.taintDict[this.bytes.length - i + 1];
+                        console.log(str + '0x' + bytes[0] + bytes[1] + bytes[2] + bytes[3] + " taint: " + JSON.stringify(taint));
+                    }
+                    else {
+                        console.log(str + '0x' + bytes[0] + bytes[1] + bytes[2] + bytes[3]);
+                    }
                 }
                 if (i+3 < 16) {
                     str = "-0x0";
