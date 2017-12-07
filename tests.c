@@ -134,3 +134,11 @@ int test11(int n)
         result -= result / n;
     return result;
 }
+
+long long test12(long long a) {
+  long long res = 0;
+  for (long long i = a; i > 0; i--) {
+    res = i;
+  }
+  return res;
+}
