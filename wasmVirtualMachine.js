@@ -864,6 +864,11 @@ function run_function(mod, function_idx, params) {
         op_code = func.code[code_ptr];
         if (DEBUG) {
             mod.stack.print();
+            mod.memories[0].print();
+            console.log("LABLES: " + labels.length);
+            for (let as = 0; as < labels.length; as++) {
+                console.log("lbl " + as + ": type: " + labels[as].block_type);
+            }
             console.log("evaluating opcode: 0x" +op_code.toString(16) + " at: " + code_ptr)
             console.log("\n");
         }
@@ -1035,13 +1040,13 @@ function run_function(mod, function_idx, params) {
                 }
                 label = labels[idx];
                 ret_val = null;
-                if (label[ret_type] != empty_result_type) {
+                if (label.ret_type != empty_result_type) {
                     if (mod.stack.len() <= 0) {
                         console.log("stack is empty at label end");
                         return -1;
                     }
                     ret_val = mod.stack.pop();
-                    if (ret_val.type != label[ret_type]) {
+                    if (ret_val.type != label.ret_type) {
                         console.log("invalid value on top of stack at the end of an expression");
                         return -1;
                     }
@@ -1063,7 +1068,7 @@ function run_function(mod, function_idx, params) {
 
                 // remove old labels
                 for (let lbl = 0; lbl <= idx; lbl++) {
-                    labels.pop();
+                    labels.shift();
                 }
 
                 if (label.block_type == loop_op_code) {
@@ -1102,7 +1107,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (top_val.value != 0) {
+                if (top_val.value != 0) {         
                     label = labels[idx];
                     ret_val = null;
                     if (label.ret_type != empty_result_type) {
@@ -1133,7 +1138,7 @@ function run_function(mod, function_idx, params) {
 
                     // remove old labels
                     for (let lbl = 0; lbl <= idx; lbl++) {
-                        labels.pop();
+                        labels.shift();
                     }
 
                     if (label.block_type == loop_op_code) {
@@ -1222,7 +1227,7 @@ function run_function(mod, function_idx, params) {
 
                 // remove old labels
                 for (let lbl = 0; lbl <= idx; lbl++) {
-                    labels.pop();
+                    labels.shift();
                 }
 
 
@@ -1493,14 +1498,14 @@ function run_function(mod, function_idx, params) {
             // memory instruction op codes
             case i32_load_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1524,11 +1529,16 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
+                console.log(buf);
                 // read buffer with little endian storage
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint32(0);
+                c = dataView.getUint32(0, true);
+                console.log(c);
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
@@ -1537,14 +1547,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1567,6 +1577,9 @@ function run_function(mod, function_idx, params) {
                 if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
+                }
+                if (ea < 0) {
+                    ea += mem.length;
                 }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
@@ -1590,14 +1603,14 @@ function run_function(mod, function_idx, params) {
                 return -1;
             case i32_load8_s_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1620,6 +1633,9 @@ function run_function(mod, function_idx, params) {
                 if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
+                }
+                if (ea < 0) {
+                    ea += mem.length;
                 }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
@@ -1636,14 +1652,14 @@ function run_function(mod, function_idx, params) {
 
             case i32_load8_u_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1667,6 +1683,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
@@ -1679,14 +1698,14 @@ function run_function(mod, function_idx, params) {
 
             case i32_load16_s_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1709,6 +1728,9 @@ function run_function(mod, function_idx, params) {
                 if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
+                }
+                if (ea < 0) {
+                    ea += mem.length;
                 }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
@@ -1724,14 +1746,14 @@ function run_function(mod, function_idx, params) {
 
             case i32_load16_u_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1755,6 +1777,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
@@ -1767,14 +1792,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load8_s_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1797,6 +1822,9 @@ function run_function(mod, function_idx, params) {
                 if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
+                }
+                if (ea < 0) {
+                    ea += mem.length;
                 }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
@@ -1814,14 +1842,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load8_u_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1845,6 +1873,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
@@ -1857,14 +1888,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load16_s_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1887,6 +1918,9 @@ function run_function(mod, function_idx, params) {
                 if (ea + N/8 > mem.length) {
                     console.log("trying to read unset memory addr");
                     return -1;
+                }
+                if (ea < 0) {
+                    ea += mem.length;
                 }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
@@ -1903,14 +1937,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load16_u_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1934,6 +1968,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
@@ -1946,14 +1983,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load32_s_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -1977,10 +2014,13 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint32(0);
+                c = dataView.getUint32(0, true);
                 if (c > Math.pow(2, 32)) {
                     c -= Math.pow(2, 32);
                 }
@@ -1992,14 +2032,14 @@ function run_function(mod, function_idx, params) {
 
             case i64_load32_u_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2023,10 +2063,13 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint32(0);
+                c = dataView.getUint32(0, true);
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
@@ -2035,14 +2078,14 @@ function run_function(mod, function_idx, params) {
 
             case i32_store_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2072,26 +2115,28 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                console.log("ea1: " + ea);
+                if (ea < 0) {
+                    ea += mem.length;
+                }
+                console.log("ea: " + ea);
                 // write buffer
                 buf = new Uint8Array(N/8);
                 dataView = new DataView(buf.buffer);
                 dataView.setUint32(0, c.value, true);
-
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
             case i64_store_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2125,6 +2170,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 // write buffer
                 opt = {
                     endian : 'little',
@@ -2133,9 +2181,7 @@ function run_function(mod, function_idx, params) {
                 buf = c.toBuffer(opt);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
             case f32_store_op_code:
                 console.log("floating point operations are not supported");
@@ -2145,14 +2191,14 @@ function run_function(mod, function_idx, params) {
                 return -1;
             case i32_store8_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2182,6 +2228,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 n = c.value % Math.pow(2, N);
                 // write buffer
                 buf = new Uint8Array(N/8);
@@ -2189,21 +2238,19 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint8(0, n, true);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
 
             case i32_store16_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2233,6 +2280,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 n = c.value % Math.pow(2, N);
                 // write buffer
                 buf = new Uint8Array(N/8);
@@ -2240,21 +2290,19 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint16(0, n, true);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
 
             case i64_store8_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2288,6 +2336,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 n = c.value.mod(Math.pow(2, N)).toNumber();
                 // write buffer
                 buf = new Uint8Array(N/8);
@@ -2295,21 +2346,19 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint8(0, n, true);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
 
             case i64_store16_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2343,6 +2392,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 n = c.value.mod(Math.pow(2, N)).toNumber();
                 // write buffer
                 buf = new Uint8Array(N/8);
@@ -2350,21 +2402,19 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint16(0, n, true);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
 
             case i64_store32_op_code:
                 code_ptr++;
-                // get memarg, start with offset
-                decode = Leb.decodeUInt32(func.code, code_ptr);
-                code_ptr = decode.nextIndex;
-                offset = decode.value;
-                // then get align
+                // get memarg, start with align
                 decode = Leb.decodeUInt32(func.code, code_ptr);
                 code_ptr = decode.nextIndex;
                 align = decode.value;
+                // then get offset
+                decode = Leb.decodeUInt32(func.code, code_ptr);
+                code_ptr = decode.nextIndex;
+                offset = decode.value;
 
                 // get memory instance
                 if (!mod.memories[0]) {
@@ -2398,6 +2448,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
+                if (ea < 0) {
+                    ea += mem.length;
+                }
                 n = c.value.mod(Math.pow(2,N)).toNumber();
                 // write buffer
                 buf = new Uint8Array(N/8);
@@ -2405,9 +2458,7 @@ function run_function(mod, function_idx, params) {
                 dataView.setUint32(0, n, true);
 
                 // store buffer to memory
-                for (let j = 0; j < N/8; j++) {
-                    mem[ea + j] = dataView.buffer[j];
-                }
+                mem.set(buf, ea);
                 break;
 
             case current_memory_op_code:
