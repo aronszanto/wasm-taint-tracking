@@ -1,4 +1,5 @@
-const DEBUG = true;
+const DEBUG = false;
+const BLOCK_TAINT = true;
 
 const ModuleInstance = require('./ModuleInstance');
 const MemoryInstance = require('./MemoryInstance');
@@ -243,6 +244,32 @@ let memories = [];
 let globals = [];
 let module_exports = [];
 let start = undefined;
+
+function add_label_taint(old_taint, variable) {
+    let keys = Object.keys(variable.taint);
+    let new_taint = {};
+    for (let i = 0; i < keys.length; i++) {
+        if (variable.taint[keys[i]] & 2 > 0) {
+            new_taint[keys[i]] |= 2;
+        }
+    }
+    keys = Object.keys(old_taint);
+    for (let i = 0; i < keys.length; i++) {
+        if (old_taint[keys[i]] > 0) {
+            new_taint[keys[i]] |= old_taint[keys[i]];
+        }
+    }
+    return new_taint;
+}
+
+function transfer_block_taint(labels, var_to_taint) {
+    if (BLOCK_TAINT) {
+        if (labels.length < 1) {
+            return;
+        }
+        var_to_taint.transfer_indirect_taint(labels[0]);
+    }
+}
 
 function parse_init_expression(byte_code, i) {
     let ret;
@@ -832,6 +859,7 @@ function run_function(mod, function_idx, params) {
     let rets;
     let ret_type;
     let new_var;
+    let next_taint = {};
     while (code_ptr < func.code.length) {
         op_code = func.code[code_ptr];
         if (DEBUG) {
@@ -857,7 +885,8 @@ function run_function(mod, function_idx, params) {
                     {
                         block_type: block_op_code,
                         ret_type: type,
-                        start: code_ptr-2
+                        start: code_ptr-2,
+                        taint: {}
                     }
                 );
                 mod.stack.push(new Variable(label_type, 0));
@@ -871,9 +900,11 @@ function run_function(mod, function_idx, params) {
                     {
                         block_type: loop_op_code,
                         ret_type: type,
-                        start: code_ptr-2
+                        start: code_ptr-2,
+                        taint: next_taint
                     }
                 );
+                next_taint = {};
                 mod.stack.push(new Variable(label_type, 0));
                 break;
             case if_op_code:
@@ -892,7 +923,8 @@ function run_function(mod, function_idx, params) {
                         {
                             block_type: if_op_code,
                             ret_type: type,
-                            start: code_ptr-2
+                            start: code_ptr-2,
+                            taint: add_label_taint({}, test_val)
                         }
                     );
                     mod.stack.push(new Variable(label_type, 0));
@@ -917,7 +949,8 @@ function run_function(mod, function_idx, params) {
                             {
                                 block_type: if_op_code,
                                 ret_type: type,
-                                start: code_ptr-2
+                                start: code_ptr-2,
+                                taint: add_label_taint({}, test_val)
                             }
                         );
                         mod.stack.push(new Variable(label_type, 0));
@@ -1105,6 +1138,7 @@ function run_function(mod, function_idx, params) {
 
                     if (label.block_type == loop_op_code) {
                         code_ptr = label.start;
+                        next_taint = label.taint;
                     }
                     // go to the end of the block
                     else {
@@ -1116,6 +1150,8 @@ function run_function(mod, function_idx, params) {
                         }
                     }
 
+                } else {
+                    labels[idx].taint = add_label_taint(labels[idx].taint, top_val);
                 }
                 break;
             case br_table_op_code:
@@ -1192,6 +1228,7 @@ function run_function(mod, function_idx, params) {
 
                 if (label.block_type == loop_op_code) {
                     code_ptr = label.start;
+                    next_taint = label.taint;
                 }
                 // go to the end of the block
                 else {
@@ -1358,9 +1395,11 @@ function run_function(mod, function_idx, params) {
                 }
                 if (cond.value == 0) {
                     var2.transfer_indirect_taint(cond);
+                    transfer_block_taint(labels, var2);
                     mod.stack.push(var2);
                 } else {
                     var1.transfer_indirect_taint(cond);
+                    transfer_block_taint(labels, var1);
                     mod.stack.push(var1);
                 }
                 code_ptr++;
@@ -2452,10 +2491,12 @@ function run_function(mod, function_idx, params) {
                 if (top_val.value == 0) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(top_val);
+                    transfer_block_taint(labels, top_val);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(top_val);
+                    transfer_block_taint(labels, top_val);
                     mod.stack.push(new_var);
                 }
 
@@ -2478,11 +2519,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2505,11 +2550,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2538,11 +2587,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2567,11 +2620,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2601,11 +2658,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2629,11 +2690,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2663,11 +2728,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2692,11 +2761,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2725,11 +2798,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2754,11 +2831,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2785,11 +2866,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2816,11 +2901,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2847,11 +2936,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2879,11 +2972,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2911,11 +3008,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2943,11 +3044,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -2975,11 +3080,15 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 1);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 } else {
                     new_var = new Variable(int32_type, 0);
                     new_var.transfer_indirect_taint(val1);
                     new_var.transfer_indirect_taint(val2);
+                    transfer_block_taint(labels, val1);
+                    transfer_block_taint(labels, val2);
                     mod.stack.push(new_var);
                 }
 
@@ -3046,6 +3155,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_lz)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i32_ctz_op_code:
@@ -3075,6 +3185,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_tz)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i32_popcnt_op_code:
@@ -3098,6 +3209,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_nzb)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i32_add_op_code:
@@ -3116,6 +3228,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_sub_op_code:
@@ -3135,6 +3249,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_mul_op_code:
@@ -3154,6 +3270,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_div_s_op_code:
@@ -3173,6 +3291,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 0)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                     break;
                 }
@@ -3181,6 +3301,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, res)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                 }
                 break;
@@ -3201,6 +3323,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, 0)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                     break;
                 }
@@ -3209,6 +3333,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int32_type, res)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                 }
                 break;
@@ -3228,6 +3354,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_or_op_code:
@@ -3246,6 +3374,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_xor_op_code:
@@ -3264,6 +3394,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_shl_op_code:
@@ -3283,6 +3415,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_shr_s_op_code:
@@ -3302,6 +3436,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_shr_u_op_code:
@@ -3322,6 +3458,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_rotl_op_code:
@@ -3341,6 +3479,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i32_rotr_op_code:
@@ -3360,6 +3500,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
 
@@ -3384,6 +3526,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_lz)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i64_ctz_op_code:
@@ -3413,6 +3556,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_tz)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i64_popcnt_op_code:
@@ -3436,6 +3580,7 @@ function run_function(mod, function_idx, params) {
                 }
                 new_var = new Variable(int32_type, nb_nzb)
                 new_var.transfer_direct_taint(c);
+                transfer_block_taint(labels, c);
                 mod.stack.push(new_var);
                 break;
             case i64_add_op_code:
@@ -3454,6 +3599,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_sub_op_code:
@@ -3472,6 +3619,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_mul_op_code:
@@ -3490,6 +3639,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_div_s_op_code:
@@ -3510,6 +3661,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int64_type, Bignum(0))
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                     break;
                 }
@@ -3518,6 +3671,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int64_type, res)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                 }
                 break;
@@ -3538,6 +3693,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int64_type, Bignum(0))
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                     break;
                 }
@@ -3546,6 +3703,8 @@ function run_function(mod, function_idx, params) {
                     new_var = new Variable(int64_type, res)
                     new_var.transfer_direct_taint(c1);
                     new_var.transfer_direct_taint(c2);
+                    transfer_block_taint(labels, c1);
+                    transfer_block_taint(labels, c2);
                     mod.stack.push(new_var);
                 }
                 break;
@@ -3565,6 +3724,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_or_op_code:
@@ -3583,6 +3744,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_xor_op_code:
@@ -3601,6 +3764,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_shl_op_code:
@@ -3620,6 +3785,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_shr_s_op_code:
@@ -3639,6 +3806,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_shr_u_op_code:
@@ -3658,6 +3827,8 @@ function run_function(mod, function_idx, params) {
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
                 new_var.transfer_direct_taint(c2);
+                transfer_block_taint(labels, c1);
+                transfer_block_taint(labels, c2);
                 mod.stack.push(new_var);
                 break;
             case i64_rotl_op_code:
@@ -3766,6 +3937,7 @@ function run_function(mod, function_idx, params) {
                 res = c1.value.mod(Math.pow(2, 32)).toNumber();
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
+                transfer_block_taint(labels, c1);
                 mod.stack.push(new_var);
                 break;
             case i32_trunc_s_f32_op_code:
@@ -3794,6 +3966,7 @@ function run_function(mod, function_idx, params) {
                 res = Bignum(c1.value);
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
+                transfer_block_taint(labels, c1);
                 mod.stack.push(new_var);
                 break;
             case i64_extend_u_i32_op_code:
@@ -3817,6 +3990,7 @@ function run_function(mod, function_idx, params) {
                 res = Bignum.fromBuffer(b, opts);
                 new_var = new Variable(int64_type, res)
                 new_var.transfer_direct_taint(c1);
+                transfer_block_taint(labels, c1);
                 mod.stack.push(new_var);
                 break;
             case i64_trunc_s_f32_op_code:
