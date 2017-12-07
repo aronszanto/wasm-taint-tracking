@@ -168,6 +168,15 @@ const tests = [
         expected_taint: {
             '0': 3
         }
+    },
+    {
+        name: 'test12',
+        print_name: 'large number of variable assignments',
+        params: [Math.pow(2,10)],
+        expected_output: 1,
+        expected_taint: {
+            '0': 3
+        }
     }
 
 ];
