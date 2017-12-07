@@ -2115,11 +2115,9 @@ function run_function(mod, function_idx, params) {
                     console.log("trying to read unset memory addr during store");
                     return -1;
                 }
-                console.log("ea1: " + ea);
                 if (ea < 0) {
                     ea += mem.length;
                 }
-                console.log("ea: " + ea);
                 // write buffer
                 buf = new Uint8Array(N/8);
                 dataView = new DataView(buf.buffer);
