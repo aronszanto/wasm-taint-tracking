@@ -1,7 +1,7 @@
 var fs = require('fs');
 const WAVM = require('./wasmVirtualMachine.js');
-const test_file = 'tests.wasm';
-//const test_file = 'tests_unoptimized.wasm';
+//const test_file = 'tests.wasm';
+const test_file = 'tests_unoptimized.wasm';
 const FgRed = "\x1b[31m";
 const FgGreen = "\x1b[32m";
 const Reset = "\x1b[0m";
@@ -67,7 +67,7 @@ const tests = [
     {
         name: 'test5',
         params: [5, 3],
-        expected_output: 15,
+        expected_output: 20,
         expected_taint: {
             '0': 3,
             '1': 2
@@ -91,8 +91,8 @@ byte_code = new Uint8Array(data);
 let VM = new WAVM(byte_code);
 console.log("Running tests compiled with opimization\n");
 
-//for (let test_num = 0; test_num < tests.length; test_num++) {
-for (let test_num = 7; test_num < 8; test_num++) {
+for (let test_num = 0; test_num < tests.length; test_num++) {
+//for (let test_num = 7; test_num < 8; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
     let output = VM.run_function(tst.name, tst.params);
