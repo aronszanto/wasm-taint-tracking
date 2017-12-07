@@ -15,6 +15,14 @@ const tests = [
         }
     },
     {
+        name: 'test0',
+        params: [-1],
+        expected_output: 1,
+        expected_taint: {
+            '0': 2
+        }
+    },
+    {
         name: 'test1',
         params: [5],
         expected_output: 7,
