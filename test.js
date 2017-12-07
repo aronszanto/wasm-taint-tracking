@@ -92,10 +92,16 @@ let VM = new WAVM(byte_code);
 console.log("Running tests compiled with opimization\n");
 
 for (let test_num = 0; test_num < tests.length; test_num++) {
-//for (let test_num = 7; test_num < 9; test_num++) {
+//for (let test_num = 0; test_num < 1; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
     let output = VM.run_function(tst.name, tst.params);
+    if (output == -1) {
+        console.log(FgRed + "Fail!");
+        console.log("    Encounter error!");
+        continue;
+    }
+
     let res = output[0];
     if (res.value == tst.expected_output && JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
         console.log(FgGreen + "Success!");
