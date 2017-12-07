@@ -1751,7 +1751,9 @@ function run_function(mod, function_idx, params) {
                 // read buffer with little endian storage
                 dataView = new DataView(buf.buffer);
                 c = dataView.getUint32(0, true);
-
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
+                }
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
                 // transfer taint from memory to the new variable and from the index
@@ -1865,8 +1867,8 @@ function run_function(mod, function_idx, params) {
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
                 c = dataView.getUint8(0, true);
-                if (c > Math.pow(2, 8)) {
-                    c -= Math.pow(2, 8);
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
                 }
 
                 // push loaded value to the stack
@@ -1973,8 +1975,8 @@ function run_function(mod, function_idx, params) {
                 dataView = new DataView(buf.buffer);
                 console.log(buf); //print
                 c = dataView.getUint16(0, true);
-                if (c > Math.pow(2, 16)) {
-                    c -= Math.pow(2, 16);
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
                 }
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
@@ -2079,8 +2081,8 @@ function run_function(mod, function_idx, params) {
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
                 c = dataView.getUint8(0, true);
-                if (c > Math.pow(2, 8)) {
-                    c -= Math.pow(2, 8);
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
                 }
 
 
@@ -2187,8 +2189,8 @@ function run_function(mod, function_idx, params) {
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
                 c = dataView.getUint16(0, true);
-                if (c > Math.pow(2, 16)) {
-                    c -= Math.pow(2, 16);
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
                 }
 
                 // push loaded value to the stack
@@ -2294,8 +2296,8 @@ function run_function(mod, function_idx, params) {
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
                 c = dataView.getUint32(0, true);
-                if (c > Math.pow(2, 32)) {
-                    c -= Math.pow(2, 32);
+                if (c > Math.pow(2, N-1)) {
+                    c -= Math.pow(2, N);
                 }
 
                 // push loaded value to the stack
