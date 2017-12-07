@@ -1,7 +1,7 @@
 var fs = require('fs');
 const WAVM = require('./wasmVirtualMachine.js');
-const test_file = 'tests.wasm';
-const test_file_unoptimized = 'tests_unoptimized.wasm';
+//const test_file = 'tests.wasm';
+const test_file = 'tests_unoptimized.wasm';
 const FgRed = "\x1b[31m";
 const FgGreen = "\x1b[32m";
 const Reset = "\x1b[0m";
@@ -92,42 +92,16 @@ let VM = new WAVM(byte_code);
 console.log("Running tests compiled with opimization\n");
 
 for (let test_num = 0; test_num < tests.length; test_num++) {
-//for (let test_num = 7; test_num < 9; test_num++) {
-    let tst = tests[test_num];
-    console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
-    let output = VM.run_function(tst.name, tst.params);
-    let res = output[0];
-    if (res.value == tst.expected_output && JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
-        console.log(FgGreen + "Success!");
-    } else {
-        console.log(FgRed + "Fail!");
-    }
-    if (res.value == tst.expected_output) {
-        console.log(FgGreen + "    Expected output: " + tst.expected_output + ". Got: " + res.value);
-    } else {
-        console.log(FgRed + "    Expected output: " + tst.expected_output + ". Got: " + res.value);
-    }
-    
-    if (JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
-        console.log(FgGreen + "    Expected taint: " + JSON.stringify(tst.expected_taint) + ". Got: " + JSON.stringify(res.taint));
-    } else {
-        console.log(FgRed + "    Expected taint: " + JSON.stringify(tst.expected_taint) + ". Got: " +JSON.stringify(res.taint));
-    }
-    console.log(Reset);
-}
-    
-let byte_code_u;
-let data_u = fs.readFileSync(test_file_unoptimized);
-byte_code_u = new Uint8Array(data_u);
-
-let VM_u = new WAVM(byte_code_u);
-console.log("Running tests compiled without opimization\n");
-
-for (let test_num = 0; test_num < tests.length; test_num++) {
 //for (let test_num = 0; test_num < 1; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
-    let output = VM_u.run_function(tst.name, tst.params);
+    let output = VM.run_function(tst.name, tst.params);
+    if (output == -1) {
+        console.log(FgRed + "Fail!");
+        console.log("    Encounter error!");
+        continue;
+    }
+
     let res = output[0];
     if (res.value == tst.expected_output && JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
         console.log(FgGreen + "Success!");

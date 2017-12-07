@@ -1370,9 +1370,10 @@ function run_function(mod, function_idx, params) {
                     if (label.block_type == loop_op_code) {
                         code_ptr = label.start;
                         next_taint = label.taint;
+                    } else {
+                        // go to the end of the block
+                        code_ptr = skip_to_end(func.code, code_ptr, popped);
                     }
-                    // go to the end of the block
-                    code_ptr = skip_to_end(func.code, code_ptr, popped);
                 } else {
                     labels[idx].taint = add_label_taint(labels[idx].taint, top_val);
                 }
