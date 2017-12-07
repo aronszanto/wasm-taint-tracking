@@ -1989,7 +1989,6 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                console.log(buf); //print
                 c = dataView.getUint16(0, true);
                 if (c > Math.pow(2, N-1)) {
                     c -= Math.pow(2, N);
@@ -4031,7 +4030,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 c2 = mod.stack.pop();
-                c2 = mod.stack.pop();
+                c1 = mod.stack.pop();
                 if (c1.type != int64_type || c2.type != int64_type) {
                     console.log("value of invalid type on top of stack");
                     return -1;
@@ -4336,7 +4335,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
                 res = c1.value.mod(Math.pow(2, 32)).toNumber();
-                new_var = new Variable(int64_type, res)
+                new_var = new Variable(int32_type, res)
                 new_var.transfer_direct_taint(c1);
                 transfer_block_taint(labels, c1);
                 mod.stack.push(new_var);

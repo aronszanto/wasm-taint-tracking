@@ -1,6 +1,11 @@
 # webAssemblyTaintTracking
 
-Setup:
-npm install leb
-npm install utf8-string-bytes
-npm install bignum
+## Setup:
+```npm install```
+
+## Testing:
+Optimized code:
+```node test.js```
+
+Unoptimized code:
+```node tests.js -u```

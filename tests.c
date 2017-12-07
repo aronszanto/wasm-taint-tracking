@@ -1,3 +1,4 @@
+
 // x should have a full taint from n.
 int test0(int n) {
   int x = 1;
@@ -65,3 +66,29 @@ int test5(int a, int b) {
   return x;
 }
 
+// x should be directly tainted by a
+int test6(long long a) {
+  short x = (short) a;
+  return x;
+}
+
+// x should be directly tainted by a
+int test7(long long a) {
+  int x = (int) a;
+  return x;
+}
+
+// x should be directly tainted by a and b
+long long test8(long long a, long long b) {
+  long long x = a + b;
+  return x;
+}
+
+// x should be directly tainted by a
+long long test9(long long a) {
+  long long x = 1;
+  for(; a > 0; a --) {
+    x *= a;
+  }
+  return x;
+}
