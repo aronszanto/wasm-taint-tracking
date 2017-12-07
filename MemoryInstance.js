@@ -8,6 +8,15 @@ class MemoryInstance {
             this.bytes = bytes;
         }
     }
+
+    print() {
+        console.log("MEMORY: ");
+        let string = "";
+        for(let i = 0; i < 20; i++) {
+            string += " " + i + "-" + this.bytes[i].toString();
+        };
+        console.log(string);
+    }
 }
 
 module.exports = MemoryInstance;
