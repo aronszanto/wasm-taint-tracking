@@ -8,6 +8,7 @@ if (process.argv[2] == '-u') {
 }
 const FgRed = "\x1b[31m";
 const FgGreen = "\x1b[32m";
+const FgYellow = "\x1b[33m";
 const Reset = "\x1b[0m";
 const tests = [
     {
@@ -169,26 +170,33 @@ for (let test_num = 0; test_num < tests.length; test_num++) {
     let output = VM.run_function(tst.name, tst.params);
     if (output == -1) {
         console.log(FgRed + "Fail!");
-        console.log("    Encounter error!");
+        console.log("    Encountered error!");
         continue;
     }
 
     let res = output[0];
+    let color = FgYellow;
     if (res.value == tst.expected_output && JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
         console.log(FgGreen + "Success!");
+        color = FgGreen;
     } else {
-        console.log(FgRed + "Fail!");
-    }
-    if (res.value == tst.expected_output) {
-        console.log(FgGreen + "    Expected output: " + tst.expected_output + ". Got: " + res.value);
-    } else {
-        console.log(FgRed + "    Expected output: " + tst.expected_output + ". Got: " + res.value);
-    }
-    
-    if (JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
-        console.log(FgGreen + "    Expected taint: " + JSON.stringify(tst.expected_taint) + ". Got: " + JSON.stringify(res.taint));
-    } else {
-        console.log(FgRed + "    Expected taint: " + JSON.stringify(tst.expected_taint) + ". Got: " +JSON.stringify(res.taint));
-    }
+        if (res.value != tst.expected_output) {
+            color = FgRed;
+        } else {
+            let keys = Object.keys(tst.expected_taint);
+            for (let i = 0; i < keys.length; i++) {
+                if (tst.expected_taint[keys[i]] == 3 && (!res.taint[keys[i]] || res.taint[keys[i]] == 2)) {
+                    color = FgRed; 
+                }
+            }
+        }
+        if (color == FgRed) {
+            console.log(FgRed + "Fail!");
+        } else {
+            console.log(FgYellow + "Missed indirect taint. This is expected");
+        }
+    } 
+    console.log(color + "    Expected output: " + tst.expected_output + ". Got: " + res.value);
+    console.log(color + "    Expected taint: " + JSON.stringify(tst.expected_taint) + ". Got: " + JSON.stringify(res.taint));
     console.log(Reset);
 }
