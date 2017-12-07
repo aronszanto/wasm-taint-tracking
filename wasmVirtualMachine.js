@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 const BLOCK_TAINT = true;
 
 const ModuleInstance = require('./ModuleInstance');
@@ -1804,9 +1804,9 @@ function run_function(mod, function_idx, params) {
                 // read buffer with little endian storage
                 opt = {
                     endian : 'little',
-                    size : 1
+                    size : 8
                 };
-                c = Bignum.fromBuffer(b, opt);
+                c = Bignum.fromBuffer(buf, opt);
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, c);
@@ -1864,9 +1864,9 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint8(0);
-                if (c > Math.pow(2, 32)) {
-                    c -= Math.pow(2, 32);
+                c = dataView.getUint8(0, true);
+                if (c > Math.pow(2, 8)) {
+                    c -= Math.pow(2, 8);
                 }
 
                 // push loaded value to the stack
@@ -1919,7 +1919,7 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint8(0);
+                c = dataView.getUint8(0, true);
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
@@ -1971,9 +1971,10 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint16(0);
-                if (c > Math.pow(2, 32)) {
-                    c -= Math.pow(2, 32);
+                console.log(buf); //print
+                c = dataView.getUint16(0, true);
+                if (c > Math.pow(2, 16)) {
+                    c -= Math.pow(2, 16);
                 }
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
@@ -2025,7 +2026,7 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint16(0);
+                c = dataView.getUint16(0, true);
 
                 // push loaded value to the stack
                 new_var = new Variable(int32_type, c);
@@ -2077,9 +2078,9 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint8(0);
-                if (c > Math.pow(2, 32)) {
-                    c -= Math.pow(2, 32);
+                c = dataView.getUint8(0, true);
+                if (c > Math.pow(2, 8)) {
+                    c -= Math.pow(2, 8);
                 }
 
 
@@ -2133,7 +2134,7 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint8(0);
+                c = dataView.getUint8(0, true);
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
@@ -2185,9 +2186,9 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint16(0);
-                if (c > Math.pow(2, 32)) {
-                    c -= Math.pow(2, 32);
+                c = dataView.getUint16(0, true);
+                if (c > Math.pow(2, 16)) {
+                    c -= Math.pow(2, 16);
                 }
 
                 // push loaded value to the stack
@@ -2240,7 +2241,7 @@ function run_function(mod, function_idx, params) {
                 // read memory
                 buf = mem.slice(ea, ea + N/8);
                 dataView = new DataView(buf.buffer);
-                c = dataView.getUint16(0);
+                c = dataView.getUint16(0, true);
 
                 // push loaded value to the stack
                 new_var = new Variable(int64_type, Bignum.bignum(c));
@@ -2438,7 +2439,7 @@ function run_function(mod, function_idx, params) {
                 }
                 // get value to be stored from stack
                 c = mod.stack.pop();
-                if (c.type != int32_type) {
+                if (c.type != int64_type) {
                     console.log("mismatching type in stack variable during store");
                     return -1;
                 }
@@ -2464,9 +2465,9 @@ function run_function(mod, function_idx, params) {
                 // write buffer
                 opt = {
                     endian : 'little',
-                    size : 1
+                    size : 8
                 };
-                buf = c.toBuffer(opt);
+                buf = c.value.toBuffer(opt);
                 // store buffer to memory
                 mem.set(buf, ea);
                 // propagate taint to the memory dict for the right index
@@ -4356,7 +4357,7 @@ function run_function(mod, function_idx, params) {
                 }
                 opts = {
                     endian : 'little',
-                    size : 1
+                    size : 8
                 };
                 buf = Uint8Array(8);
                 dataView = DataView(b);
@@ -4456,7 +4457,12 @@ class WASMInterpreter {
                 this.module.funcs[exp.index].type.params.forEach((prm) => {
                     let taint = {};
                     taint[i] = 3;
-                    var_params.push(new Variable(prm, params[i], taint));
+                    if (prm == int64_type) {
+                        var_params.push(new Variable(prm, Bignum(params[i]), taint));
+                    }
+                    else {
+                        var_params.push(new Variable(prm, params[i], taint));
+                    }
                     i++;
                 });
                 return run_function(this.module, exp.index, var_params);
