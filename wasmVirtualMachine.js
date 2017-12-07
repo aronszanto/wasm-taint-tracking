@@ -1091,14 +1091,17 @@ function run_function(mod, function_idx, params) {
     while (code_ptr < func.code.length) {
         op_code = func.code[code_ptr];
         if (DEBUG) {
+            console.log("---------------------------------------------------------------");
             mod.stack.print();
+            console.log("");
             mod.memories[0].print();
-            console.log("LABLES: " + labels.length);
+            console.log("\nLABLES:");
             for (let as = 0; as < labels.length; as++) {
                 console.log("lbl " + as + ": type: " + labels[as].block_type);
             }
+            console.log("");
             console.log("evaluating opcode: 0x" +op_code.toString(16) + " at: " + code_ptr)
-            console.log("\n");
+            console.log("");
         }
         switch (op_code) {
 
