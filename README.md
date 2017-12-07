@@ -14,7 +14,7 @@ For example:
 ```
 node run.js tests.wasm test3 10 11
 ```
-An simple compiler for C/C++ to wasm can be found at https://mbebenita.github.io/WasmExplorer/
+A simple compiler for C/C++ to wasm can be found at https://mbebenita.github.io/WasmExplorer/
 
 ## Testing:
 Optimized code:
