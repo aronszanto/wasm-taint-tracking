@@ -58,11 +58,31 @@ class MemoryInstance {
 
     print() {
         console.log("MEMORY: ");
-        let string = "";
-        for(let i = this.bytes.length-1; i > this.bytes.length-20; i--) {
-            string += " " + i + "-" + this.bytes[i];
+        let str = undefined;
+        let bytes = ['0', '0', '0', '0'];
+        let str_rep;
+        for(let i = 1; i < 33; i++) {
+            if (i % 4 == 1) {
+                if (str != undefined) {
+                    console.log(str + '0x' + bytes[0] + bytes[1] + bytes[2] + bytes[3]);
+                }
+                if (i+3 < 16) {
+                    str = "-0x0";
+                } else {
+                    str = "-0x";
+                }
+                
+                str += (i+3).toString(16) + ": ";
+            }
+            if (this.bytes[this.bytes.length-i] < 16) {
+                str_rep = "0";
+            } else {
+                str_rep = "";
+            }
+            str_rep += this.bytes[this.bytes.length-i].toString(16);
+            //console.log("A " + this.bytes[this.bytes.length-i]);
+            bytes[3 - ((i - 1) % 4)] = str_rep;
         };
-        console.log(string);
     }
 }
 

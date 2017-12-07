@@ -245,6 +245,234 @@ let globals = [];
 let module_exports = [];
 let start = undefined;
 
+function skip_to_end(code, ptr, counter) {
+    let dec;
+    while (counter > 0) {
+        switch(code[ptr]) {
+
+            case expression_end_code:
+                counter--;
+                ptr++;
+                break;
+
+            case block_op_code:
+            case loop_op_code:
+            case if_op_code:
+                ptr+= 2;
+                counter++;
+                break;
+
+
+            //special cases
+            case br_table_op_code:
+                ptr++;
+                dec = Leb.decodeUInt32(code, ptr);
+                ptr = ptr + dec.value;
+                break;
+
+            // 0 variables
+            case unreachable_op_code:
+            case nop_op_code:
+            case return_op_code:
+            case else_op_code:
+            case drop_op_code:
+            case select_op_code:
+            case i32_eqz_op_code:
+            case i32_eq_op_code:
+            case i32_ne_op_code:
+            case i32_lt_s_op_code:
+            case i32_lt_u_op_code:
+            case i32_gt_s_op_code:
+            case i32_gt_u_op_code:
+            case i32_le_s_op_code:
+            case i32_le_u_op_code:
+            case i32_ge_s_op_code:
+            case i32_ge_u_op_code:
+            case i64_eqz_op_code:
+            case i64_eq_op_code:
+            case i64_ne_op_code:
+            case i64_lt_s_op_code:
+            case i64_lt_u_op_code:
+            case i64_gt_s_op_code:
+            case i64_gt_u_op_code:
+            case i64_le_s_op_code:
+            case i64_le_u_op_code:
+            case i64_ge_s_op_code:
+            case i64_ge_u_op_code:
+            case f32_eq_op_code:
+            case f32_ne_op_code:
+            case f32_lt_op_code:
+            case f32_gt_op_code:
+            case f32_le_op_code:
+            case f32_ge_op_code:
+            case f64_eq_op_code:
+            case f64_ne_op_code:
+            case f64_lt_op_code:
+            case f64_gt_op_code:
+            case f64_le_op_code:
+            case f64_ge_op_code:
+            case i32_clz_op_code:
+            case i32_ctz_op_code:
+            case i32_popcnt_op_code:
+            case i32_add_op_code:
+            case i32_sub_op_code:
+            case i32_mul_op_code:
+            case i32_div_s_op_code:
+            case i32_div_u_op_code:
+            case i32_rem_s_op_code:
+            case i32_rem_u_op_code:
+            case i32_and_op_code:
+            case i32_or_op_code:
+            case i32_xor_op_code:
+            case i32_shl_op_code:
+            case i32_shr_s_op_code:
+            case i32_shr_u_op_code:
+            case i32_rotl_op_code:
+            case i32_rotr_op_code:
+            case i64_clz_op_code:
+            case i64_ctz_op_code:
+            case i64_popcnt_op_code:
+            case i64_add_op_code:
+            case i64_sub_op_code:
+            case i64_mul_op_code:
+            case i64_div_s_op_code:
+            case i64_div_u_op_code:
+            case i64_rem_s_op_code:
+            case i64_rem_u_op_code:
+            case i64_and_op_code:
+            case i64_or_op_code:
+            case i64_xor_op_code:
+            case i64_shl_op_code:
+            case i64_shr_s_op_code:
+            case i64_shr_u_op_code:
+            case i64_rotl_op_code:
+            case i64_rotr_op_code:
+            case f32_abs_op_code:
+            case f32_neg_op_code:
+            case f32_ceil_op_code:
+            case f32_floor_op_code:
+            case f32_trunc_op_code:
+            case f32_nearest_op_code:
+            case f32_sqrt_op_code:
+            case f32_add_op_code:
+            case f32_sub_op_code:
+            case f32_mul_op_code:
+            case f32_dic_op_code:
+            case f32_min_op_code:
+            case f32_max_op_code:
+            case f32_copysign_op_code:
+            case f64_abs_op_code:
+            case f64_neg_op_code:
+            case f64_ceil_op_code:
+            case f64_floor_op_code:
+            case f64_trunc_op_code:
+            case f64_nearest_op_code:
+            case f64_sqrt_op_code:
+            case f64_add_op_code:
+            case f64_sub_op_code:
+            case f64_mul_op_code:
+            case f64_dic_op_code:
+            case f64_min_op_code:
+            case f64_max_op_code:
+            case f64_copysign_op_code:
+            case i32_wrap_i64_op_code:
+            case i32_trunc_s_f32_op_code:
+            case i32_trunc_u_f32_op_code:
+            case i32_trunc_s_f64_op_code:
+            case i32_trunc_u_f64_op_code:
+            case i64_extend_s_i32_op_code:
+            case i64_extend_u_i32_op_code:
+            case i64_trunc_s_f32_op_code:
+            case i64_trunc_u_f32_op_code:
+            case i64_trunc_s_f64_op_code:
+            case i64_trunc_u_f64_op_code:
+            case f32_convert_s_i32_op_code:
+            case f32_convert_u_i32_op_code:
+            case f32_convert_s_i64_op_code:
+            case f32_convert_u_i64_op_code:
+            case f32_denote_f64_op_code:
+            case f64_convert_s_i32_op_code:
+            case f64_convert_u_i32_op_code:
+            case f64_convert_s_i64_op_code:
+            case f64_convert_u_i64_op_code:
+            case f64_promote_f32_op_code:
+            case i32_reinterpret_f32_op_code:
+            case i64_reinterpret_f64_op_code:
+            case f32_reinterpret_i32_op_code:
+            case f64_reinterpret_i64_op_code:
+                ptr++;
+                break;
+
+            // 1 Variable
+            case call_op_code:
+            case br_op_code:
+            case br_if_op_code:
+            case get_local_op_code:
+            case set_local_op_code:
+            case tee_local_op_code:
+            case get_global_op_code:
+            case set_global_op_code:
+            case current_memory_op_code:
+            case grow_memory_op_code:
+                ptr += 2;
+                break;
+
+            // 2 variables
+            case call_indirect_op_code:
+                ptr += 3;
+                break;
+
+            // 2 32bit vals
+            case i32_load_op_code:
+            case i64_load_op_code:
+            case f32_load_op_code:
+            case f64_load_op_code:
+            case i32_load8_s_op_code:
+            case i32_load8_u_op_code:
+            case i32_load16_s_op_code:
+            case i32_load16_u_op_code:
+            case i64_load8_s_op_code:
+            case i64_load8_u_op_code:
+            case i64_load16_s_op_code:
+            case i64_load16_u_op_code:
+            case i64_load32_s_op_code:
+            case i64_load32_u_op_code:
+            case i32_store_op_code:
+            case i64_store_op_code:
+            case f32_store_op_code:
+            case f64_store_op_code:
+            case i32_store8_op_code:
+            case i32_store16_op_code:
+            case i64_store8_op_code:
+            case i64_store16_op_code:
+            case i64_store32_op_code:
+                ptr++;
+                dec = Leb.decodeUInt32(code, ptr);
+                ptr = dec.nextIndex;
+                dec = Leb.decodeUInt32(code, ptr);
+                ptr = dec.nextIndex;
+                break;
+
+            // 1 32bit val
+            case const_i32_op_code:
+            case const_f32_op_code:
+                ptr++;
+                dec = Leb.decodeInt32(code, ptr);
+                ptr = dec.nextIndex;
+                break;
+
+            // 1 64 bit val
+            case const_f64_op_code:
+            case const_i64_op_code:
+                ptr++;
+                dec = Leb.decodeInt64(code, ptr);
+                ptr = dec.nextIndex;
+                break;
+        }
+    }
+    return ptr;
+}
+
 function add_label_taint(old_taint, variable) {
     let keys = Object.keys(variable.taint);
     let new_taint = {};
@@ -863,14 +1091,17 @@ function run_function(mod, function_idx, params) {
     while (code_ptr < func.code.length) {
         op_code = func.code[code_ptr];
         if (DEBUG) {
+            console.log("---------------------------------------------------------------");
             mod.stack.print();
+            console.log("");
             mod.memories[0].print();
-            console.log("LABLES: " + labels.length);
+            console.log("\nLABLES:");
             for (let as = 0; as < labels.length; as++) {
                 console.log("lbl " + as + ": type: " + labels[as].block_type);
             }
+            console.log("");
             console.log("evaluating opcode: 0x" +op_code.toString(16) + " at: " + code_ptr)
-            console.log("\n");
+            console.log("");
         }
         switch (op_code) {
 
@@ -1076,12 +1307,7 @@ function run_function(mod, function_idx, params) {
                 }
                 // go to the end of the block
                 else {
-                    while (popped > 0) {
-                        if (func.code[code_ptr] == expression_end_code) {
-                            popped--;
-                        }
-                        code_ptr++;
-                    }
+                    code_ptr = skip_to_end(func.code, code_ptr, popped);
                 }
 
                 break;
@@ -1107,7 +1333,7 @@ function run_function(mod, function_idx, params) {
                     return -1;
                 }
 
-                if (top_val.value != 0) {         
+                if (top_val.value != 0) {
                     label = labels[idx];
                     ret_val = null;
                     if (label.ret_type != empty_result_type) {
@@ -1137,6 +1363,7 @@ function run_function(mod, function_idx, params) {
                     }
 
                     // remove old labels
+                    console.log(code_ptr);
                     for (let lbl = 0; lbl <= idx; lbl++) {
                         labels.shift();
                     }
@@ -1146,15 +1373,7 @@ function run_function(mod, function_idx, params) {
                         next_taint = label.taint;
                     }
                     // go to the end of the block
-                    else {
-                        while (popped > 0) {
-                            if (func.code[code_ptr] == expression_end_code) {
-                                popped--;
-                            }
-                            code_ptr++;
-                        }
-                    }
-
+                    code_ptr = skip_to_end(func.code, code_ptr, popped);
                 } else {
                     labels[idx].taint = add_label_taint(labels[idx].taint, top_val);
                 }
@@ -1237,12 +1456,7 @@ function run_function(mod, function_idx, params) {
                 }
                 // go to the end of the block
                 else {
-                    while (popped > 0) {
-                        if (func.code[code_ptr] == expression_end_code) {
-                            popped--;
-                        }
-                        code_ptr++;
-                    }
+                    code_ptr = skip_to_end(func.code, code_ptr, popped);
                 }
                 break;
             case return_op_code:
