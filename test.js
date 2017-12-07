@@ -90,8 +90,8 @@ byte_code = new Uint8Array(data);
 let VM = new WAVM(byte_code);
 console.log('available functions: ' + VM.get_functions() + "\n");
 
-for (let test_num = 0; test_num < tests.length; test_num++) {
-//for (let test_num = 4; test_num < 5; test_num++) {
+//for (let test_num = 0; test_num < tests.length; test_num++) {
+for (let test_num = 8; test_num < 9; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
     let output = VM.run_function(tst.name, tst.params);
