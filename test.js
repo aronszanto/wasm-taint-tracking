@@ -85,13 +85,13 @@ const tests = [
 ];
 
 let byte_code;
-data = fs.readFileSync(test_file);
+let data = fs.readFileSync(test_file);
 byte_code = new Uint8Array(data);
 
 let VM = new WAVM(byte_code);
 console.log("Running tests compiled with opimization\n");
 
-for (let test_num = 99; test_num < tests.length; test_num++) {
+for (let test_num = 0; test_num < tests.length; test_num++) {
 //for (let test_num = 7; test_num < 9; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
@@ -116,18 +116,18 @@ for (let test_num = 99; test_num < tests.length; test_num++) {
     console.log(Reset);
 }
     
-byte_code;
-data = fs.readFileSync(test_file_unoptimized);
-byte_code = new Uint8Array(data);
+let byte_code_u;
+let data_u = fs.readFileSync(test_file_unoptimized);
+byte_code_u = new Uint8Array(data_u);
 
-VM = new WAVM(byte_code);
+let VM_u = new WAVM(byte_code_u);
 console.log("Running tests compiled without opimization\n");
 
-//for (let test_num = 0; test_num < tests.length; test_num++) {
-for (let test_num = 0; test_num < 1; test_num++) {
+for (let test_num = 0; test_num < tests.length; test_num++) {
+//for (let test_num = 0; test_num < 1; test_num++) {
     let tst = tests[test_num];
     console.log(Reset + "Running test " + tst.name + " with parameters: " + tst.params);
-    let output = VM.run_function(tst.name, tst.params);
+    let output = VM_u.run_function(tst.name, tst.params);
     let res = output[0];
     if (res.value == tst.expected_output && JSON.stringify(res.taint) == JSON.stringify(tst.expected_taint)) {
         console.log(FgGreen + "Success!");

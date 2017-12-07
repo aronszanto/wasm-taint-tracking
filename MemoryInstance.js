@@ -80,7 +80,7 @@ class MemoryInstance {
                 str_rep = "";
             }
             str_rep += this.bytes[this.bytes.length-i].toString(16);
-            console.log("A " + this.bytes[this.bytes.length-i]);
+            //console.log("A " + this.bytes[this.bytes.length-i]);
             bytes[3 - ((i - 1) % 4)] = str_rep;
         };
     }
