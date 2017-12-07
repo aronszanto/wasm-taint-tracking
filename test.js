@@ -6,7 +6,7 @@ const FgGreen = "\x1b[32m";
 const Reset = "\x1b[0m";
 const tests = [
     {
-        name: '_Z5test0i',
+        name: 'test0',
         params: [5],
         expected_output: 120,
         expected_taint: {
@@ -14,7 +14,7 @@ const tests = [
         }
     },
     {
-        name: '_Z5test1i',
+        name: 'test1',
         params: [5],
         expected_output: 7,
         expected_taint: {
@@ -22,7 +22,7 @@ const tests = [
         }
     },
     {
-        name: '_Z5test2i',
+        name: 'test2',
         params: [2],
         expected_output: -1,
         expected_taint: {
@@ -30,7 +30,7 @@ const tests = [
         }
     },
     {
-        name: '_Z5test2i',
+        name: 'test2',
         params: [-2],
         expected_output: 1,
         expected_taint: {
@@ -38,7 +38,7 @@ const tests = [
         }
     },
     {
-        name: '_Z5test3ii',
+        name: 'test3',
         params: [3, 7],
         expected_output: 6,
         expected_taint: {
@@ -46,7 +46,7 @@ const tests = [
         }
     },
     {
-        name: '_Z5test4ii',
+        name: 'test4',
         params: [10, 20],
         expected_output: 14,
         expected_taint: {
@@ -55,11 +55,29 @@ const tests = [
         }
     },
     {
-        name: '_Z5test4ii',
+        name: 'test4',
         params: [10, -20],
         expected_output: 13,
         expected_taint: {
             '0': 3,
+            '1': 2
+        }
+    },
+    {
+        name: 'test5',
+        params: [5, 3],
+        expected_output: 15,
+        expected_taint: {
+            '0': 3,
+            '1': 2
+        }
+    },
+    {
+        name: 'test5',
+        params: [3, 5],
+        expected_output: -1,
+        expected_taint: {
+            '0': 2,
             '1': 2
         }
     }
